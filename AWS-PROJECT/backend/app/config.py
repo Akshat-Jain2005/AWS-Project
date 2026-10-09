@@ -18,6 +18,15 @@ OPERATOR_TOKENS = _tokens("OPERATOR_TOKENS", "dev-operator-1:Operator One,dev-op
 REPORTER_TOKENS = _tokens("REPORTER_TOKENS", "dev-reporter:Verified Reporter")
 SENSOR_API_KEY = os.getenv("SENSOR_API_KEY", "")
 
+# Amazon SNS – set USE_AWS_SNS=1 and provide topic ARNs to enable live delivery.
+# When disabled (default), all messages remain in the in-memory outbox only.
+AWS_REGION = os.getenv("AWS_REGION", "ap-southeast-2")
+USE_AWS_SNS = os.getenv("USE_AWS_SNS", "0") == "1"
+SNS_TOPIC_ARN_OPERATORS = os.getenv("SNS_TOPIC_ARN_OPERATORS", "")
+SNS_TOPIC_ARN_CITIZENS = os.getenv("SNS_TOPIC_ARN_CITIZENS", "")
+SNS_SMS_SENDER_ID = os.getenv("SNS_SMS_SENDER_ID", "BIOSNT")
+SNS_SMS_TYPE = os.getenv("SNS_SMS_TYPE", "Transactional")
+
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
 DEV_RAZORPAY_SECRET = "dev_razorpay_secret"  # used only when real keys are not set

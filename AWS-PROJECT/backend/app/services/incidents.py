@@ -1,5 +1,6 @@
 import math
 import time
+# pyrefly: ignore [missing-import]
 from .. import config as C
 from ..store import db
 from . import notify
@@ -80,6 +81,10 @@ def _raise(station_id, source, level, anomaly_type, forecast, report_id=None):
         db.log_audit("system", "INCIDENT_OPENED", {"incident_id": inc["id"], "station_id": station_id, "source": source})
         if db.rules["operator_telegram_on_incident"]:
             notify.send_telegram(f"Bio-Sentinel alert: {anomaly_type} at {station_id} ({level}). Incident {inc['id']}.")
+        notify.alert_operators(
+            f"Bio-Sentinel: {level}",
+            f"Incident {inc['id']}: {anomaly_type} detected at {station_id}. Threat level: {level}.",
+        )
     return inc
 
 
