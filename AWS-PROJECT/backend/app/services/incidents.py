@@ -1,0 +1,160 @@
+import math
+import time
+from .. import config as C
+from ..store import db
+from . import notify
+from bio_sentinel_inference import STATION_METADATA
+
+LEVEL_RANK = {"NORMAL": 0, "ELEVATED_LEVEL_1": 1, "WARNING_LEVEL_2": 2, "CRITICAL_LEVEL_3": 3}
+
+
+def haversine_km(lat1, lon1, lat2, lon2):
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi, dl = p2 - p1, math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 6371.0 * 2 * math.asin(math.sqrt(a))
+
+
+def nearest_station(lat, lng):
+    best = min(C.STATION_COORDS.items(), key=lambda kv: haversine_km(lat, lng, *kv[1]))
+    return best[0], haversine_km(lat, lng, *best[1])
+
+
+def report_severity(r):
+    pts = 0
+    a, ph = r.get("ammonia_ppm"), r.get("ph")
+    if a is not None:
+        pts += 3 if a >= 3.0 else 2 if a >= 0.9 else 0
+    if ph is not None and (ph < 6.5 or ph > 8.5):
+        pts += 1
+    pts += min(len(set(r.get("observations", [])) & C.BAD_OBSERVATIONS), 3)
+    return "red" if pts >= 3 else "amber" if pts >= 1 else "green"
+
+
+def report_weight(r):
+    return 1.0 if r["reporter_type"] == "verified" else 0.5
+
+
+def forecast_for(station_id, result=None):
+    if result and result.get("arrival_forecast"):
+        return result["arrival_forecast"]
+    dist = STATION_METADATA.get(station_id, {}).get("distance_km", 0.0)
+    v = 2.2
+    return {
+        "river_velocity_kmh": v,
+        "distance_km": dist,
+        "estimated_hours_to_wazirabad": round(dist / v, 1) if dist else 0.0,
+        "predicted_intake_ammonia_ppm": None,
+    }
+
+
+def open_incident_for(station_id):
+    for inc in db.incidents.values():
+        if inc["station_id"] == station_id and inc["status"] in ("OPEN", "ACKNOWLEDGED"):
+            return inc
+    return None
+
+
+def _raise(station_id, source, level, anomaly_type, forecast, report_id=None):
+    now = int(time.time())
+    created = False
+    with db.lock:
+        inc = open_incident_for(station_id)
+        if inc is None:
+            created = True
+            inc = {
+                "id": db.new_id("inc"), "station_id": station_id, "status": "OPEN",
+                "level": level, "anomaly_type": anomaly_type, "sources": [],
+                "report_ids": [], "opened_at": now, "last_seen": now,
+                "forecast": forecast, "normal_streak": 0,
+            }
+            db.incidents[inc["id"]] = inc
+        if source not in inc["sources"]:
+            inc["sources"].append(source)
+        if report_id and report_id not in inc["report_ids"]:
+            inc["report_ids"].append(report_id)
+        inc["last_seen"], inc["normal_streak"] = now, 0
+        if LEVEL_RANK[level] > LEVEL_RANK[inc["level"]]:
+            inc["level"], inc["anomaly_type"] = level, anomaly_type
+    if created:
+        db.log_audit("system", "INCIDENT_OPENED", {"incident_id": inc["id"], "station_id": station_id, "source": source})
+        if db.rules["operator_telegram_on_incident"]:
+            notify.send_telegram(f"Bio-Sentinel alert: {anomaly_type} at {station_id} ({level}). Incident {inc['id']}.")
+    return inc
+
+
+def on_telemetry(station_id, result):
+    if result["anomaly_detected"] and LEVEL_RANK.get(result["threat_level"], 0) >= 2:
+        return _raise(station_id, "sensor", result["threat_level"], result["anomaly_type"],
+                      forecast_for(station_id, result))
+    inc = open_incident_for(station_id)
+    if inc and result["threat_level"] == "NORMAL" and "reports" not in inc["sources"]:
+        inc["normal_streak"] += 1
+        if inc["normal_streak"] >= C.AUTOCLOSE_NORMAL_READINGS:
+            close_incident(inc["id"], "system", None)
+    return inc
+
+
+def on_report(rep):
+    if rep["severity"] != "red" or rep["status"] == "rejected":
+        return None
+    station_id, dist = nearest_station(rep["lat"], rep["lng"])
+    existing = open_incident_for(station_id)
+    if existing and dist <= C.STATION_ATTACH_RADIUS_KM:
+        return _raise(station_id, "reports", existing["level"], existing["anomaly_type"],
+                      existing["forecast"], rep["id"])
+    now = time.time()
+    weight = 0.0
+    for other in db.reports.values():
+        if other["status"] == "rejected" or other["severity"] != "red":
+            continue
+        if now - other["created_at"] > C.CLUSTER_WINDOW_S:
+            continue
+        if haversine_km(rep["lat"], rep["lng"], other["lat"], other["lng"]) <= C.CLUSTER_RADIUS_KM:
+            weight += report_weight(other)
+    if weight >= C.CLUSTER_MIN_WEIGHT:
+        return _raise(station_id, "reports", "WARNING_LEVEL_2", "FIELD_REPORT_CLUSTER",
+                      forecast_for(station_id), rep["id"])
+    return None
+
+
+def close_incident(incident_id, actor, actor_id):
+    inc = db.incidents.get(incident_id)
+    if not inc or inc["status"] == "CLOSED":
+        return None
+    inc["status"], inc["closed_at"] = "CLOSED", int(time.time())
+    db.log_audit(actor, "INCIDENT_CLOSED", {"incident_id": incident_id}, actor_id)
+    return inc
+
+
+def confidence(inc):
+    s = set(inc["sources"])
+    if {"sensor", "reports"} <= s:
+        return "CONFIRMED"
+    if s == {"reports"}:
+        return "UNVERIFIED_SEND_INSPECTOR"
+    return "SENSOR_ALERT"
+
+
+def incident_view(inc):
+    hours = inc["forecast"].get("estimated_hours_to_wazirabad") or 0.0
+    eta = inc["opened_at"] + int(hours * 3600)
+    return {**inc, "confidence": confidence(inc), "eta_timestamp": eta,
+            "t_minus_seconds": max(0, eta - int(time.time()))}
+
+
+def overall_status():
+    open_incs = [i for i in db.incidents.values() if i["status"] in ("OPEN", "ACKNOWLEDGED")]
+    if db.gate["intake_status"] != "OPEN" or any(LEVEL_RANK[i["level"]] >= 3 for i in open_incs):
+        return "ALERT"
+    if open_incs or any(s.get("status", "NORMAL") != "NORMAL" for s in db.stations.values()):
+        return "WATCH"
+    return "NORMAL"
+
+
+def deficit_view():
+    on = db.gate["intake_status"] != "OPEN"
+    return {
+        "deficit_mgd": C.DEFICIT_MGD if on else 0,
+        "rationing": [{"ward": w, "schedule": s} for w, s in C.WARD_SCHEDULES.items()] if on else [],
+    }

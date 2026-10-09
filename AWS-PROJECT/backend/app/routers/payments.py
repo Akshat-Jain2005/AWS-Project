@@ -1,0 +1,45 @@
+from fastapi import APIRouter, HTTPException
+from .. import config as C
+from ..schemas import OrderIn, PaymentVerifyIn
+from ..services import payments
+from ..store import db
+
+router = APIRouter()
+
+
+def _active_campaign():
+    return "relief" if db.gate["intake_status"] != "OPEN" else "upkeep"
+
+
+@router.get("/campaigns")
+def campaigns():
+    totals = payments.totals()
+    wall = [{"name": e["name"], "amount_inr": e["amount_inr"], "campaign_id": e["campaign_id"]}
+            for e in reversed(db.ledger[-10:])]
+    return {
+        "active": _active_campaign(),
+        "campaigns": [{"id": k, **v, "raised_inr": totals[k]} for k, v in C.CAMPAIGNS.items()],
+        "donor_wall": wall,
+    }
+
+
+@router.post("/donations/order")
+def create_order(body: OrderIn):
+    if "@" not in body.donor_email:
+        raise HTTPException(422, "Enter a valid email for the receipt")
+    try:
+        return payments.create_order(body, body.campaign_id or _active_campaign())
+    except Exception:
+        raise HTTPException(502, "Payment provider error. Please try again.")
+
+
+@router.post("/verify-payment")
+def verify_payment(body: PaymentVerifyIn):
+    if body.order_id not in db.donations:
+        raise HTTPException(404, "Unknown order")
+    if not payments.signature_ok(body.order_id, body.payment_id, body.signature):
+        db.log_audit("system", "PAYMENT_SIGNATURE_FAILED", {"order_id": body.order_id})
+        raise HTTPException(400, "Signature verification failed")
+    entry, created = payments.record_payment(body.order_id, body.payment_id)
+    return {"verified": True, "status": "PAYMENT_RECORDED", "order_id": body.order_id,
+            "amount_inr": entry["amount_inr"], "new": created}
