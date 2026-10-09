@@ -44,6 +44,9 @@ def _deliver(alert, subs):
     if "telegram" in alert["channels"]:
         first = next(iter(alert["texts"].values()), {"en": ""})
         notify.send_telegram(f"[{alert['kind']}] {first['en']}")
+    # Broadcast to SNS citizen alert topic for all subscribed ward residents
+    first_text = next(iter(alert["texts"].values()), {"en": ""})
+    notify.alert_citizens(f"Bio-Sentinel: {alert['kind']}", first_text.get("en", ""))
     alert.update(status="sent", sent=sent, skipped_cooldown=skipped, sent_at=int(now))
 
 
