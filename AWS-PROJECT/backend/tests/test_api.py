@@ -162,6 +162,26 @@ def test_restore_sends_all_clear_and_rules_can_be_disabled(client):
     assert any("All clear" in m["text"] for m in db.outbox if m["channel"] == "sms")
 
 
+def test_telegram_live_mock_dispatch(client):
+    # Toxic telemetry opens an incident and dispatches a rich HTML Telegram alert.
+    client.post("/telemetry", json=telemetry(toxic=True))
+    tg = [m for m in db.outbox if m["channel"] == "telegram"]
+    assert tg, "expected a telegram message in the outbox"
+    assert any("<b>" in m["text"] and "BIO-SENTINEL" in m["text"] for m in tg)
+
+    # An operator bulletin routed to the telegram channel is recorded with HTML too.
+    db.outbox.clear()
+    r = client.post("/alerts/send",
+                    json={"wards": ["Civil Lines"], "channels": ["telegram"], "message": "Boil water advisory"},
+                    headers=OP1)
+    assert r.status_code == 201
+    tg = [m for m in db.outbox if m["channel"] == "telegram"]
+    assert tg and "<b>" in tg[0]["text"] and "Boil water advisory" in tg[0]["text"]
+
+    # In DEV_MODE nothing is sent over the wire – the "to" is the configured chat/console.
+    assert all(m["to"] for m in tg)
+
+
 # ---------- donations and Razorpay ----------
 
 def sign(order_id, payment_id, secret="dev_razorpay_secret"):

@@ -2,6 +2,11 @@ import os
 import sys
 
 os.environ["DEV_MODE"] = "1"
+os.environ["USE_AWS_SNS"] = "0"  # keep SNS off during tests even if .env enables it
+# Blank the SNS topic ARNs so publish_to_topic stays a no-op in tests (it records
+# to db.outbox whenever an ARN is set, regardless of USE_AWS_SNS).
+os.environ["SNS_TOPIC_ARN_OPERATORS"] = ""
+os.environ["SNS_TOPIC_ARN_CITIZENS"] = ""
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import pytest

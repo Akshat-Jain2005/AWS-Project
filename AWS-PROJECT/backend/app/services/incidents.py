@@ -80,7 +80,17 @@ def _raise(station_id, source, level, anomaly_type, forecast, report_id=None):
     if created:
         db.log_audit("system", "INCIDENT_OPENED", {"incident_id": inc["id"], "station_id": station_id, "source": source})
         if db.rules["operator_telegram_on_incident"]:
-            notify.send_telegram(f"Bio-Sentinel alert: {anomaly_type} at {station_id} ({level}). Incident {inc['id']}.")
+            hours = forecast.get("estimated_hours_to_wazirabad", "N/A")
+            msg = (
+                f"🚨 <b>BIO-SENTINEL RIVER DEFENSE ALERT</b>\n\n"
+                f"<b>Station:</b> <code>{station_id}</code>\n"
+                f"<b>Threat Level:</b> <b>{level}</b>\n"
+                f"<b>Diagnosis:</b> {anomaly_type}\n"
+                f"<b>Incident ID:</b> <code>{inc['id']}</code>\n"
+                f"<b>Plume Arrival:</b> ~{hours} hrs to Wazirabad Intake\n\n"
+                f"⚠️ <i>Action: Review operator console and prepare intake gate actuation.</i>"
+            )
+            notify.send_telegram(msg)
         notify.alert_operators(
             f"Bio-Sentinel: {level}",
             f"Incident {inc['id']}: {anomaly_type} detected at {station_id}. Threat level: {level}.",

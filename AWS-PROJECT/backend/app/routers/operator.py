@@ -26,10 +26,10 @@ def gate_command(cmd: GateIn, user=Depends(require_operator)):
             if inc["status"] == "OPEN":
                 inc["status"] = "ACKNOWLEDGED"
         if db.rules["sms_on_shutdown"]:
-            a = alerts.create_alert("rationing", list(C.WARD_SCHEDULES), ["sms"], "system:rule", system=True)
+            a = alerts.create_alert("rationing", list(C.WARD_SCHEDULES), ["sms", "telegram"], "system:rule", system=True)
             alert_id = a["id"]
     elif db.rules["all_clear_on_restore"]:
-        a = alerts.create_alert("all_clear", list(C.WARD_SCHEDULES), ["sms"], "system:rule", system=True)
+        a = alerts.create_alert("all_clear", list(C.WARD_SCHEDULES), ["sms", "telegram"], "system:rule", system=True)
         alert_id = a["id"]
     return {"success": True, "current_gate_status": new, **incidents.deficit_view(),
             "audit_log": entry, "alert_id": alert_id}
