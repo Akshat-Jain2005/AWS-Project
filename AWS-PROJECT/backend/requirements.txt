@@ -1,0 +1,12 @@
+boto3==1.43.109
+botocore==1.43.109
+numpy>=2.0.0
+pandas>=2.2.0
+scikit-learn>=1.5.0
+lightgbm>=4.5.0
+joblib>=1.4.0
+fastapi>=0.115.0
+uvicorn>=0.30.0
+pydantic>=2.8.0
+requests>=2.32.0
+pytest>=8.3.0
