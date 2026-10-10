@@ -1,9 +1,10 @@
 import math
+import re
 import time
 # pyrefly: ignore [missing-import]
 from .. import config as C
 from ..store import db
-from . import notify
+from . import notify, llm
 from bio_sentinel_inference import STATION_METADATA
 
 LEVEL_RANK = {"NORMAL": 0, "ELEVATED_LEVEL_1": 1, "WARNING_LEVEL_2": 2, "CRITICAL_LEVEL_3": 3}
@@ -56,6 +57,63 @@ def open_incident_for(station_id):
     return None
 
 
+def _static_operator_alert(station_id, level, anomaly_type, incident_id, hours):
+    return (
+        f"🚨 <b>BIO-SENTINEL RIVER DEFENSE ALERT</b>\n\n"
+        f"<b>Station:</b> <code>{station_id}</code>\n"
+        f"<b>Threat Level:</b> <b>{level}</b>\n"
+        f"<b>Diagnosis:</b> {anomaly_type}\n"
+        f"<b>Incident ID:</b> <code>{incident_id}</code>\n"
+        f"<b>Plume Arrival:</b> ~{hours} hrs to Wazirabad Intake\n\n"
+        f"⚠️ <i>Action: Review operator console and prepare intake gate actuation.</i>"
+    )
+
+
+_DOC_TAGS = re.compile(r"<!doctype|</?(?:html|head|body|style|script|div|p|span|ul|ol|li|br|table)\b", re.I)
+_FENCE = re.compile(r"```[a-zA-Z]*\n?|```")
+
+
+def _sanitize_telegram_html(msg):
+    """Keep only Telegram-safe inline HTML. Strips markdown code fences and
+    rejects any full-document / block-level markup (returns "" so the caller
+    falls back to the static template rather than send unrenderable HTML)."""
+    if not msg:
+        return ""
+    cleaned = _FENCE.sub("", msg).strip()
+    if _DOC_TAGS.search(cleaned):
+        return ""
+    return cleaned
+
+
+def _operator_alert_text(station_id, level, anomaly_type, incident_id, hours):
+    """High-urgency Telegram SITREP for the Chief Engineer. Uses Bedrock when
+    USE_AI_ALERTS is on and the call succeeds, else the static template."""
+    if C.USE_AI_ALERTS:
+        system_prompt = (
+            "You are the Bio-Sentinel AI alerting the Chief Engineer. "
+            "You output a single Telegram alert message and nothing else. "
+            "Telegram supports ONLY these inline HTML tags: <b>, <i>, <code>, <a>. "
+            "NEVER emit document tags (<!DOCTYPE>, <html>, <head>, <body>, "
+            "<style>, <script>, <div>, <p>), CSS, or markdown code fences. "
+            "Keep it under 500 characters."
+        )
+        user_prompt = (
+            f"A river contamination incident has been detected.\n"
+            f"Station: {station_id}\n"
+            f"Threat level: {level}\n"
+            f"Anomaly type: {anomaly_type}\n"
+            f"Incident ID: {incident_id}\n"
+            f"Estimated hours for the plume to reach the Wazirabad intake: {hours}\n\n"
+            f"Write a short, high-urgency situation report. Use a few emojis and "
+            f"only <b>/<i>/<code> for emphasis. Advise immediate review of the "
+            f"operator console and the intake gates. Return only the message text."
+        )
+        msg = _sanitize_telegram_html(llm.invoke_claude(system_prompt, user_prompt))
+        if msg and msg not in (llm.MOCK_RESPONSE, llm.FALLBACK_RESPONSE):
+            return msg
+    return _static_operator_alert(station_id, level, anomaly_type, incident_id, hours)
+
+
 def _raise(station_id, source, level, anomaly_type, forecast, report_id=None):
     now = int(time.time())
     created = False
@@ -81,15 +139,7 @@ def _raise(station_id, source, level, anomaly_type, forecast, report_id=None):
         db.log_audit("system", "INCIDENT_OPENED", {"incident_id": inc["id"], "station_id": station_id, "source": source})
         if db.rules["operator_telegram_on_incident"]:
             hours = forecast.get("estimated_hours_to_wazirabad", "N/A")
-            msg = (
-                f"🚨 <b>BIO-SENTINEL RIVER DEFENSE ALERT</b>\n\n"
-                f"<b>Station:</b> <code>{station_id}</code>\n"
-                f"<b>Threat Level:</b> <b>{level}</b>\n"
-                f"<b>Diagnosis:</b> {anomaly_type}\n"
-                f"<b>Incident ID:</b> <code>{inc['id']}</code>\n"
-                f"<b>Plume Arrival:</b> ~{hours} hrs to Wazirabad Intake\n\n"
-                f"⚠️ <i>Action: Review operator console and prepare intake gate actuation.</i>"
-            )
+            msg = _operator_alert_text(station_id, level, anomaly_type, inc["id"], hours)
             notify.send_telegram(msg)
         notify.alert_operators(
             f"Bio-Sentinel: {level}",
