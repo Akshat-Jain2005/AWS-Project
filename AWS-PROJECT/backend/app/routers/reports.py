@@ -12,7 +12,7 @@ router = APIRouter()
 
 def _public(r):
     return {k: r[k] for k in ("id", "created_at", "lat", "lng", "location_label", "source_type",
-                              "ammonia_ppm", "ph", "observations", "note", "severity", "reporter_type")}
+                              "ammonia_ppm", "ph", "temperature_c", "observations", "note", "severity", "reporter_type")}
 
 
 @router.post("/reports/upload-url")
@@ -32,7 +32,7 @@ def submit_report(body: ReportIn, request: Request, user=Depends(current_user)):
         "reporter_type": "verified" if verified else "citizen",
         "reporter_name": user["name"] if verified else None,
         "lat": body.lat, "lng": body.lng, "location_label": body.location_label,
-        "source_type": body.source_type, "ammonia_ppm": body.ammonia_ppm, "ph": body.ph,
+        "source_type": body.source_type, "ammonia_ppm": body.ammonia_ppm, "ph": body.ph, "temperature_c": body.temperature_c,
         "observations": [o for o in body.observations if o in C.ALLOWED_OBSERVATIONS],
         "note": body.note, "photo_key": body.photo_key,
     }
