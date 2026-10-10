@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import json
 
 from app import config
 from app.store import db
@@ -224,3 +225,44 @@ def test_amount_limits_and_state_adaptive_campaign(client):
     assert client.get("/campaigns").json()["active"] == "upkeep"
     client.post("/gate-command", json={"action": "SHUTDOWN", "rationale": "Plume confirmed"}, headers=OP1)
     assert client.get("/campaigns").json()["active"] == "relief"
+
+
+# ---------- Razorpay webhook ----------
+
+def webhook_event(order_id, payment_id="pay_wh", event="payment.captured"):
+    return {"event": event,
+            "payload": {"payment": {"entity": {"id": payment_id, "order_id": order_id}}}}
+
+
+def test_webhook_records_payment_with_valid_signature(client):
+    o = order(client, 750)
+    raw = json.dumps(webhook_event(o["order_id"], "pay_wh1")).encode()
+    sig = hmac.new(b"dev_razorpay_secret", raw, hashlib.sha256).hexdigest()
+    r = client.post("/donations/webhook", content=raw,
+                    headers={"X-Razorpay-Signature": sig, "Content-Type": "application/json"})
+    assert r.status_code == 200 and r.json()["status"] == "processed"
+    assert len(db.ledger) == 1 and db.ledger[0]["payment_id"] == "pay_wh1"
+    assert db.ledger[0]["impact_liters"] == 1500  # 750 INR * 2 L
+
+
+def test_webhook_rejects_bad_signature(client):
+    o = order(client, 750)
+    raw = json.dumps(webhook_event(o["order_id"], "pay_wh2")).encode()
+    r = client.post("/donations/webhook", content=raw, headers={"X-Razorpay-Signature": "bad"})
+    assert r.status_code == 400 and db.ledger == []
+
+
+def test_webhook_is_idempotent_and_ignores_unknown_orders(client):
+    o = order(client, 499)
+    raw = json.dumps(webhook_event(o["order_id"], "pay_wh3")).encode()
+    sig = hmac.new(b"dev_razorpay_secret", raw, hashlib.sha256).hexdigest()
+    headers = {"X-Razorpay-Signature": sig, "Content-Type": "application/json"}
+    assert client.post("/donations/webhook", content=raw, headers=headers).json()["new"] is True
+    assert client.post("/donations/webhook", content=raw, headers=headers).json()["new"] is False
+    assert len(db.ledger) == 1
+
+    unknown = json.dumps(webhook_event("order_does_not_exist", "pay_x")).encode()
+    usig = hmac.new(b"dev_razorpay_secret", unknown, hashlib.sha256).hexdigest()
+    r = client.post("/donations/webhook", content=unknown,
+                    headers={"X-Razorpay-Signature": usig, "Content-Type": "application/json"})
+    assert r.status_code == 200 and r.json()["status"] == "ignored"

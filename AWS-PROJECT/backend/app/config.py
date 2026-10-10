@@ -40,6 +40,9 @@ SNS_SMS_TYPE = os.getenv("SNS_SMS_TYPE", "Transactional")
 
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
+# Dashboard webhook secret. Falls back to RAZORPAY_KEY_SECRET when unset so the
+# webhook still verifies before a dedicated secret is configured.
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
 DEV_RAZORPAY_SECRET = "dev_razorpay_secret"  # used only when real keys are not set
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
