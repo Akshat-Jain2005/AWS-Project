@@ -69,6 +69,11 @@ AUTOCLOSE_NORMAL_READINGS = 5
 TWO_PERSON_THRESHOLD = 5000
 SMS_COOLDOWN_S = 1800
 DEFICIT_MGD = 110
+
+# Heat-aware ammonia toxicity. Starting values, calibrate against a source you cite.
+UIA_WATCH_MGL = float(os.getenv("UIA_WATCH_MGL", "0.02"))
+UIA_DANGER_MGL = float(os.getenv("UIA_DANGER_MGL", "0.20"))
+DEFAULT_WATER_TEMP_C = float(os.getenv("DEFAULT_WATER_TEMP_C", "30"))
 OTP_TTL_S = 600
 OTP_MAX_ATTEMPTS = 5
 

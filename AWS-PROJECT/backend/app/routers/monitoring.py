@@ -8,7 +8,7 @@ from bio_sentinel_inference import STATION_METADATA, evaluate_telemetry
 from .. import config as C
 from ..auth import require_operator
 from ..schemas import TelemetryPayload
-from ..services import incidents
+from ..services import incidents, toxicity
 from ..store import db
 
 router = APIRouter()
@@ -32,6 +32,13 @@ def ingest_telemetry(payload: TelemetryPayload, x_api_key: str = Header(default=
         raise HTTPException(404, "Unknown station")
     data = payload.model_dump()
     result = evaluate_telemetry(data)
+    chem = data["chemical"]
+    tox = toxicity.assess(chem["ammonia_ppm"], chem["ph"], chem["temperature_c"])
+    result["toxicity"] = tox
+    fc = result.get("arrival_forecast") or {}
+    if fc.get("predicted_intake_ammonia_ppm") is not None:  # assumes today's heat and pH persist downstream
+        fc["predicted_intake_unionized_mgl"] = round(
+            fc["predicted_intake_ammonia_ppm"] * tox["unionized_fraction"], 4)
     now = int(time.time())
     with db.lock:
         db.history[sid].append({
@@ -39,8 +46,8 @@ def ingest_telemetry(payload: TelemetryPayload, x_api_key: str = Header(default=
             **data["chemical"], **data["biological"], "threat_level": result["threat_level"],
         })
         db.stations[sid] = {"status": result["threat_level"], "last_telemetry": data,
-                            "last_result": result, "updated_at": now}
-    inc = incidents.on_telemetry(sid, result)
+                            "last_result": result, "toxicity": tox, "updated_at": now}
+    inc = incidents.on_telemetry(sid, result, tox)
     return {**result, "incident_id": inc["id"] if inc and inc["status"] != "CLOSED" else None}
 
 
@@ -58,7 +65,10 @@ def public_status():
     stations = []
     for sid, meta in STATION_METADATA.items():
         s = db.stations.get(sid, {})
+        tox = s.get("toxicity") or {}
         stations.append({"station_id": sid, "name": meta["name"], "status": s.get("status", "NORMAL"),
+                         "unionized_ammonia_mgl": tox.get("unionized_ammonia_mgl"),
+                         "toxicity_band": tox.get("band", "SAFE"),
                          "updated_at": s.get("updated_at")})
     open_incs = [incidents.incident_view(i) for i in db.incidents.values() if i["status"] != "CLOSED"]
     top = max(open_incs, key=lambda i: incidents.LEVEL_RANK[i["level"]], default=None)

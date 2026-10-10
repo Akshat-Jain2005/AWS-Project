@@ -87,13 +87,13 @@ def _deliver(alert, subs):
                 f"<b>Status:</b> Intake Gates Closed (-{C.DEFICIT_MGD} MGD Deficit)\n"
                 f"<b>Affected Areas:</b> {', '.join(alert['wards'][:3])}...\n"
                 f"<b>Schedule:</b> {first_en}\n\n"
-                f"💧 <i>Please store water safely. Clean tanker dispatch in progress.</i>"
+                "💧 <i>Please store water safely. Clean tanker dispatch in progress.</i>"
             )
         elif kind == "all_clear":
             msg = (
-                f"✅ <b>ALL CLEAR: WATER SUPPLY RESTORED</b>\n\n"
-                f"River parameters upstream have normalized. Wazirabad intake gates reopened.\n"
-                f"Normal piped supply restoring across all municipal wards."
+                "✅ <b>ALL CLEAR: WATER SUPPLY RESTORED</b>\n\n"
+                "River parameters upstream have normalized. Wazirabad intake gates reopened.\n"
+                "Normal piped supply restoring across all municipal wards."
             )
         else:
             msg = f"📢 <b>BIO-SENTINEL BULLETIN</b>\n\n{first_en}"
