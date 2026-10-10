@@ -57,6 +57,18 @@ def open_incident_for(station_id):
     return None
 
 
+def most_severe_within(station_id, window_s):
+    """Most severe incident at a station with activity in the last window_s
+    seconds, open or recently resolved. `last_seen` tracks the last unhealthy
+    reading, so an incident whose last activity predates the window is treated
+    as past and ignored (returns None). Used by the river-health map so its
+    `hours` selector actually bounds which incidents colour each reach."""
+    cutoff = time.time() - window_s
+    recent = [i for i in db.incidents.values()
+              if i["station_id"] == station_id and i.get("last_seen", 0) >= cutoff]
+    return max(recent, key=lambda i: LEVEL_RANK.get(i["level"], 0), default=None)
+
+
 def _static_operator_alert(station_id, level, anomaly_type, incident_id, hours):
     return (
         f"🚨 <b>BIO-SENTINEL RIVER DEFENSE ALERT</b>\n\n"

@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import time
 
 from app import config
 from app.store import db
@@ -266,3 +267,77 @@ def test_webhook_is_idempotent_and_ignores_unknown_orders(client):
     r = client.post("/donations/webhook", content=unknown,
                     headers={"X-Razorpay-Signature": usig, "Content-Type": "application/json"})
     assert r.status_code == 200 and r.json()["status"] == "ignored"
+
+
+# ---------- Amazon Location: map config and river-health GeoJSON ----------
+
+def test_map_config_hides_api_key(client):
+    r = client.get("/map-config")
+    assert r.status_code == 200
+    body = r.json()
+    assert {"region", "style", "style_url"} <= body.keys()
+    assert "api_key" not in body  # key must never be exposed to clients
+    assert body["region"] == config.AWS_REGION
+    # style_url points at the backend descriptor proxy, carrying no key or AWS host
+    assert "/map/style/" in body["style_url"]
+    assert "key=" not in body["style_url"] and "maps.geo." not in body["style_url"]
+
+
+def test_map_descriptor_proxy_strips_key_and_rewrites_tiles(client, monkeypatch):
+    import app.routers.monitoring as mon
+    monkeypatch.setattr(config, "LOCATION_API_KEY", "v1.public.SECRET")
+    fake = {
+        "version": 8,
+        "sources": {"aws": {"type": "vector", "tiles": [
+            "https://maps.geo.ap-southeast-2.amazonaws.com/v2/tiles/vector.basemap/{z}/{x}/{y}?key=v1.public.SECRET"]}},
+        "sprite": "https://maps.geo.ap-southeast-2.amazonaws.com/v2/styles/x/sprites/sprites",
+        "glyphs": "https://maps.geo.ap-southeast-2.amazonaws.com/v2/glyphs/{fontstack}/{range}.pbf",
+    }
+
+    class FakeResp:
+        status_code, ok = 200, True
+        def json(self):
+            return fake
+
+    monkeypatch.setattr(mon.requests, "get", lambda *a, **k: FakeResp())
+    body = client.get("/map/style/Standard/descriptor").json()
+    assert "v1.public.SECRET" not in json.dumps(body)  # key fully stripped
+    tiles0 = body["sources"]["aws"]["tiles"][0]
+    assert "/map/tiles/vector.basemap/{z}/{x}/{y}" in tiles0 and "maps.geo." not in tiles0
+
+
+def test_river_health_geojson_structure(client):
+    r = client.get("/river-health/yamuna-panipat")
+    assert r.status_code == 200
+    gj = r.json()
+    assert gj["type"] == "FeatureCollection"
+    assert len(gj["features"]) == len(config.STATION_COORDS) - 1
+    assert all(f["properties"]["health_status"] == "NORMAL" for f in gj["features"])
+    # RFC 7946 coordinate order is [lon, lat]: lon ~76.9-77.3, lat ~28.7-29.5.
+    lon, lat = gj["features"][0]["geometry"]["coordinates"][0]
+    assert 76.9 <= lon <= 77.3 and 28.7 <= lat <= 29.5
+
+
+def test_river_health_threat_escalation(client):
+    client.post("/telemetry", json=telemetry(toxic=True))  # CRITICAL at STATION_02_PANIPAT
+    gj = client.get("/river-health/yamuna-panipat").json()
+    reach = next(f for f in gj["features"] if f["properties"]["from_node"] == "STATION_02_PANIPAT")
+    assert reach["properties"]["health_status"] == "CRITICAL"
+    assert reach["properties"]["threat_level"] == "CRITICAL_LEVEL_3"
+
+
+def test_river_health_time_window_bounds_incident_age(client):
+    client.post("/telemetry", json=telemetry(toxic=True))
+    inc = next(i for i in db.incidents.values() if i["station_id"] == "STATION_02_PANIPAT")
+    inc["last_seen"] = int(time.time()) - 2 * 3600  # last unhealthy reading 2h ago
+
+    def status_at(hours):
+        gj = client.get(f"/river-health/yamuna-panipat?hours={hours}").json()
+        reach = next(f for f in gj["features"] if f["properties"]["from_node"] == "STATION_02_PANIPAT")
+        return reach["properties"]["health_status"]
+
+    assert status_at(1) == "NORMAL"      # 1h window excludes the 2h-old incident
+    assert status_at(24) == "CRITICAL"   # 24h window includes it
+    # Query bounds are enforced (ge=1, le=168)
+    assert client.get("/river-health/x?hours=0").status_code == 422
+    assert client.get("/river-health/x?hours=200").status_code == 422

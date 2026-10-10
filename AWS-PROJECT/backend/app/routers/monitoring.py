@@ -1,6 +1,9 @@
 import hmac
+import logging
+import re
 import time
-from fastapi import APIRouter, Depends, Header, HTTPException
+import requests
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from bio_sentinel_inference import STATION_METADATA, evaluate_telemetry
 from .. import config as C
 from ..auth import require_operator
@@ -9,6 +12,15 @@ from ..services import incidents
 from ..store import db
 
 router = APIRouter()
+log = logging.getLogger("bio.map")
+
+# Only tile requests carry the Location key in the style descriptor; the backend
+# proxies them so the key stays server-side. Sprites and glyphs are keyless/public.
+_KEY_QS = re.compile(r"[?&]key=[^&]*")
+
+
+def _als_base():
+    return f"https://maps.geo.{C.AWS_REGION}.amazonaws.com"
 
 
 @router.post("/telemetry")
@@ -80,3 +92,137 @@ def close(incident_id: str, user=Depends(require_operator)):
     if not inc:
         raise HTTPException(404, "Incident not found or already closed")
     return incidents.incident_view(inc)
+
+
+@router.get("/map-config")
+def get_map_config(request: Request):
+    """Client configuration for Amazon Location Service V2 map rendering.
+
+    The API key is NEVER returned. style_url points at this backend's descriptor
+    proxy, which injects the key server-side and rewrites tile URLs through the
+    tile proxy, so the key never reaches the browser or any client."""
+    base = str(request.base_url)  # e.g. http://host:port/
+    return {
+        "region": C.AWS_REGION,
+        "style": C.LOCATION_MAP_STYLE,
+        "style_url": f"{base}map/style/{C.LOCATION_MAP_STYLE}/descriptor",
+    }
+
+
+def _rewrite_tile_url(url, base):
+    """Point a Location tiles template at our keyless tile proxy, preserving the
+    {z}/{x}/{y} tokens and the tileset path (e.g. .../v2/tiles/vector.basemap/..)."""
+    marker = "/v2/tiles/"
+    path = url.split("?", 1)[0]
+    idx = path.find(marker)
+    if idx != -1:
+        return f"{base}map/tiles/{path[idx + len(marker):]}"
+    return _KEY_QS.sub("", url)
+
+
+def _scrub_key(obj):
+    """Belt-and-braces: strip any ?key=/&key= query from every string left in the
+    descriptor, so the key cannot leak even if Location adds it somewhere new."""
+    key = C.LOCATION_API_KEY
+    if not key:
+        return
+    items = obj.items() if isinstance(obj, dict) else enumerate(obj) if isinstance(obj, list) else ()
+    for k, v in items:
+        if isinstance(v, str):
+            if key in v:
+                obj[k] = _KEY_QS.sub("", v)
+        elif isinstance(v, (dict, list)):
+            _scrub_key(v)
+
+
+@router.get("/map/style/{style}/descriptor")
+def get_map_descriptor(style: str, request: Request):
+    """Server-side proxy for the Location V2 style descriptor. Fetches it with
+    the key, rewrites tile URLs through the keyless tile proxy, and strips any
+    residual key before returning the style JSON to the client."""
+    if not C.LOCATION_API_KEY:
+        raise HTTPException(503, "Map service not configured")
+    try:
+        resp = requests.get(f"{_als_base()}/v2/styles/{style}/descriptor",
+                            params={"key": C.LOCATION_API_KEY}, timeout=10)
+    except requests.RequestException as exc:
+        log.error("Location descriptor fetch failed: %s", exc)
+        raise HTTPException(502, "Map descriptor upstream error")
+    if resp.status_code == 403:
+        raise HTTPException(502, "Map key lacks geo-maps permissions")
+    if not resp.ok:
+        raise HTTPException(502, f"Map descriptor upstream {resp.status_code}")
+
+    descriptor = resp.json()
+    base = str(request.base_url)
+    for src in (descriptor.get("sources") or {}).values():
+        if isinstance(src, dict) and isinstance(src.get("tiles"), list):
+            src["tiles"] = [_rewrite_tile_url(u, base) for u in src["tiles"]]
+    _scrub_key(descriptor)
+    return descriptor
+
+
+@router.get("/map/tiles/{tileset}/{z}/{x}/{y}")
+def get_map_tile(tileset: str, z: int, x: int, y: int):
+    """Server-side proxy for Location V2 vector tiles. The key is injected here
+    and never exposed; clients fetch keyless tiles from this endpoint."""
+    if not C.LOCATION_API_KEY:
+        raise HTTPException(503, "Map service not configured")
+    try:
+        resp = requests.get(f"{_als_base()}/v2/tiles/{tileset}/{z}/{x}/{y}",
+                            params={"key": C.LOCATION_API_KEY}, timeout=10)
+    except requests.RequestException as exc:
+        log.error("Location tile fetch failed: %s", exc)
+        raise HTTPException(502, "Map tile upstream error")
+    if not resp.ok:
+        raise HTTPException(resp.status_code if resp.status_code in (403, 404) else 502,
+                            "Map tile upstream error")
+    # requests transparently decodes any gzip, so send decoded bytes without a
+    # stale Content-Encoding; content-type is the vector-tile protobuf type.
+    return Response(content=resp.content,
+                    media_type=resp.headers.get("Content-Type", "application/x-protobuf"),
+                    headers={"Cache-Control": "public, max-age=86400"})
+
+
+@router.get("/river-health/{stretch_id}")
+def get_river_health_path(stretch_id: str = "yamuna-panipat",
+                          hours: int = Query(default=24, ge=1, le=168)):
+    """RFC 7946 GeoJSON FeatureCollection of river reaches between consecutive
+    stations (hydrological order), each coloured by its upstream incident within
+    the last `hours` hours (default 24, max 168).
+
+    GIS note: STATION_COORDS are (lat, lng); GeoJSON requires [lng, lat], so
+    every point is inverted to [coord[1], coord[0]]."""
+    window_s = hours * 3600
+    features = []
+    stations = list(C.STATION_COORDS.keys())
+
+    for i in range(len(stations) - 1):
+        from_st, to_st = stations[i], stations[i + 1]
+        from_lat, from_lng = C.STATION_COORDS[from_st]
+        to_lat, to_lng = C.STATION_COORDS[to_st]
+
+        inc = incidents.most_severe_within(from_st, window_s)
+        if inc:
+            lvl = inc.get("level", "NORMAL")
+            status = "CRITICAL" if lvl == "CRITICAL_LEVEL_3" else "WARNING"
+        else:
+            status = "NORMAL"
+
+        features.append({
+            "type": "Feature",
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [[from_lng, from_lat], [to_lng, to_lat]],
+            },
+            "properties": {
+                "stretch_id": stretch_id,
+                "from_node": from_st,
+                "to_node": to_st,
+                "health_status": status,
+                "incident_id": inc["id"] if inc else None,
+                "threat_level": inc["level"] if inc else "NORMAL",
+            },
+        })
+
+    return {"type": "FeatureCollection", "features": features}
