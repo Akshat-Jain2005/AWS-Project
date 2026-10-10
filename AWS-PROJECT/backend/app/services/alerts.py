@@ -1,5 +1,9 @@
 import json
+import logging
+import smtplib
 import time
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from .. import config as C
 from ..store import db
 from . import notify, llm
@@ -135,3 +139,35 @@ def approve_alert(alert_id, approver, approver_id):
     _deliver(alert, audience(alert["wards"], alert["kind"]))
     db.log_audit(approver, "ALERT_APPROVED", {"alert_id": alert_id, "sent": alert["sent"]}, approver_id)
     return alert, "ok"
+
+
+logger = logging.getLogger(__name__)
+
+
+def send_email(to, subject, body):
+    if not C.GMAIL_SENDER or not C.GMAIL_APP_PASSWORD:
+        logger.error("Email credentials not configured (GMAIL_SENDER / GMAIL_APP_PASSWORD).")
+        return False
+
+    msg = MIMEMultipart()
+    msg["From"] = C.GMAIL_SENDER
+    msg["To"] = to
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+
+    try:
+        with smtplib.SMTP(C.SMTP_HOST, C.SMTP_PORT, timeout=15) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(C.GMAIL_SENDER, C.GMAIL_APP_PASSWORD)
+            server.sendmail(C.GMAIL_SENDER, [to], msg.as_string())
+        logger.info("Email sent to %s (subject=%r)", to, subject)
+        return True
+    except smtplib.SMTPAuthenticationError:
+        logger.exception("SMTP authentication failed for sender %s", C.GMAIL_SENDER)
+    except smtplib.SMTPRecipientsRefused:
+        logger.exception("Recipient refused: %s", to)
+    except (smtplib.SMTPException, OSError):
+        logger.exception("Failed to send email to %s", to)
+    return False

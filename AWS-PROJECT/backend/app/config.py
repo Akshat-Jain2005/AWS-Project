@@ -61,6 +61,12 @@ DEV_RAZORPAY_SECRET = "dev_razorpay_secret"  # used only when real keys are not 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
+# Gmail SMTP for email OTP delivery (app password, not account password).
+GMAIL_SENDER = os.getenv("GMAIL_SENDER", "")
+GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+
 CLUSTER_MIN_WEIGHT = 3.0       # weighted bad reports needed to raise an incident
 CLUSTER_RADIUS_KM = 2.0
 CLUSTER_WINDOW_S = 3600
