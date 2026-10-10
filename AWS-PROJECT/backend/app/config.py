@@ -38,6 +38,12 @@ SNS_TOPIC_ARN_CITIZENS = os.getenv("SNS_TOPIC_ARN_CITIZENS", "")
 SNS_SMS_SENDER_ID = os.getenv("SNS_SMS_SENDER_ID", "BIOSNT")
 SNS_SMS_TYPE = os.getenv("SNS_SMS_TYPE", "Transactional")
 
+# Amazon Location Service V2 (geo-maps). LOCATION_API_KEY is a public client
+# key (v1.public...) used for map style/descriptor rendering; also mirrored in
+# SSM SecureString /biosentinel/location/api_key.
+LOCATION_API_KEY = os.getenv("LOCATION_API_KEY", "")
+LOCATION_MAP_STYLE = os.getenv("LOCATION_MAP_STYLE", "Standard")
+
 # Amazon Bedrock – generative alert copy. Disabled by default (USE_AI_ALERTS=0)
 # so tests and local runs never reach the network; alert services fall back to
 # the static templates. Model id defaults to GLM 5 (provider Z.AI) in Bedrock.
