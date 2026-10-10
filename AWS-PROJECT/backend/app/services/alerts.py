@@ -1,10 +1,11 @@
+import json
 import time
-from .. import config as C  # type: ignore
-from ..store import db      # type: ignore
-from . import notify
+from .. import config as C
+from ..store import db
+from . import notify, llm
 
 
-def texts_for(kind, ward, override=None):
+def _static_texts(kind, ward, override=None):
     sched = C.WARD_SCHEDULES.get(ward, "as announced")
     if kind == "rationing":
         return {
@@ -18,6 +19,41 @@ def texts_for(kind, ward, override=None):
         }
     msg = override or ""
     return {"en": msg, "hi": msg}
+
+
+def _ai_texts(kind, ward):
+    """Ask Bedrock for an empathetic bilingual SMS. Returns {"en","hi"} on
+    success, or None so the caller falls back to the static template."""
+    sched = C.WARD_SCHEDULES.get(ward, "as announced")
+    situation = ("a temporary water rationing notice due to river pollution"
+                 if kind == "rationing"
+                 else "an all-clear notice that normal water supply has been restored")
+    system_prompt = (
+        "You write public water-safety SMS alerts for the Bio-Sentinel municipal "
+        "system. Be empathetic, calm and clear. Each message must be under 140 "
+        "characters. Return ONLY a JSON object, no prose, no markdown fences."
+    )
+    user_prompt = (
+        f"Write {situation} for residents of {ward} ward. "
+        f"Rationing schedule: {sched}. "
+        'Return strictly: {"en": "<English SMS>", "hi": "<Hindi SMS>"}'
+    )
+    raw = llm.invoke_claude(system_prompt, user_prompt)
+    try:
+        data = json.loads(raw)
+        if isinstance(data, dict) and data.get("en") and data.get("hi"):
+            return {"en": str(data["en"]), "hi": str(data["hi"])}
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return None
+
+
+def texts_for(kind, ward, override=None):
+    if C.USE_AI_ALERTS and kind in ("rationing", "all_clear"):
+        ai = _ai_texts(kind, ward)
+        if ai:
+            return ai
+    return _static_texts(kind, ward, override)
 
 
 def audience(wards, kind):

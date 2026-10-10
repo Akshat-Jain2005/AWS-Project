@@ -38,6 +38,13 @@ SNS_TOPIC_ARN_CITIZENS = os.getenv("SNS_TOPIC_ARN_CITIZENS", "")
 SNS_SMS_SENDER_ID = os.getenv("SNS_SMS_SENDER_ID", "BIOSNT")
 SNS_SMS_TYPE = os.getenv("SNS_SMS_TYPE", "Transactional")
 
+# Amazon Bedrock – generative alert copy. Disabled by default (USE_AI_ALERTS=0)
+# so tests and local runs never reach the network; alert services fall back to
+# the static templates. Model id defaults to GLM 5 (provider Z.AI) in Bedrock.
+BEDROCK_REGION = os.getenv("BEDROCK_REGION", "ap-southeast-2")
+BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "zai.glm-5")
+USE_AI_ALERTS = os.getenv("USE_AI_ALERTS", "0") == "1"
+
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
 # Dashboard webhook secret. Falls back to RAZORPAY_KEY_SECRET when unset so the
