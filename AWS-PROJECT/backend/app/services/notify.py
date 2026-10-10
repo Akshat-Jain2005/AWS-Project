@@ -87,19 +87,38 @@ def alert_citizens(subject, message):
     return publish_to_topic(C.SNS_TOPIC_ARN_CITIZENS, subject, message)
 
 
-def send_telegram(text):
+def send_telegram(text, parse_mode="HTML", force_live=False):
+    """Dispatch a Telegram message to the configured channel/bot.
+
+    Always appends to db.outbox for audit / test assertions – never bypass this.
+    In DEV_MODE (unit tests) no external HTTP request is made unless force_live
+    is True, so the suite neither spams the channel nor hangs on the network."""
     db.outbox.append({"channel": "telegram", "to": C.TELEGRAM_CHAT_ID or "console", "text": text})
+
+    if C.DEV_MODE and not force_live:
+        log.info("Telegram (mock): %s", text)
+        return True
+
     if not (C.TELEGRAM_BOT_TOKEN and C.TELEGRAM_CHAT_ID):
         log.info("Telegram (console): %s", text)
         return True
+
     try:
         r = requests.post(
             f"https://api.telegram.org/bot{C.TELEGRAM_BOT_TOKEN}/sendMessage",
-            json={"chat_id": C.TELEGRAM_CHAT_ID, "text": text},
+            json={
+                "chat_id": C.TELEGRAM_CHAT_ID,
+                "text": text,
+                "parse_mode": parse_mode,
+                "disable_web_page_preview": True,
+            },
             timeout=5,
         )
+        if not r.ok:
+            log.error("Telegram send failed: %s %s", r.status_code, r.text[:200])
         return r.ok
-    except requests.RequestException:
+    except requests.RequestException as exc:
+        log.error("Telegram send error: %s", exc)
         return False
 
 

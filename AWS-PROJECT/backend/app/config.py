@@ -1,4 +1,15 @@
 import os
+from pathlib import Path
+
+# Load backend/.env so TELEGRAM_* / SNS_* / AWS_REGION are available locally.
+# override=False keeps any variable already set in the environment (e.g. tests
+# that pin DEV_MODE / USE_AWS_SNS) authoritative over the .env file.
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env", override=False)
+except ImportError:  # python-dotenv optional; env vars may be provided externally
+    pass
 
 
 def _tokens(name, default):

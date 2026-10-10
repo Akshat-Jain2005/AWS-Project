@@ -42,8 +42,26 @@ def _deliver(alert, subs):
             s["last_sent_at"] = now
             sent += 1
     if "telegram" in alert["channels"]:
-        first = next(iter(alert["texts"].values()), {"en": ""})
-        notify.send_telegram(f"[{alert['kind']}] {first['en']}")
+        texts_vals = list(alert["texts"].values())
+        first_en = texts_vals[0]["en"] if texts_vals else ""
+        kind = alert["kind"]
+        if kind == "rationing":
+            msg = (
+                f"📢 <b>EMERGENCY WATER RATIONING NOTICE</b>\n\n"
+                f"<b>Status:</b> Intake Gates Closed (-{C.DEFICIT_MGD} MGD Deficit)\n"
+                f"<b>Affected Areas:</b> {', '.join(alert['wards'][:3])}...\n"
+                f"<b>Schedule:</b> {first_en}\n\n"
+                f"💧 <i>Please store water safely. Clean tanker dispatch in progress.</i>"
+            )
+        elif kind == "all_clear":
+            msg = (
+                f"✅ <b>ALL CLEAR: WATER SUPPLY RESTORED</b>\n\n"
+                f"River parameters upstream have normalized. Wazirabad intake gates reopened.\n"
+                f"Normal piped supply restoring across all municipal wards."
+            )
+        else:
+            msg = f"📢 <b>BIO-SENTINEL BULLETIN</b>\n\n{first_en}"
+        notify.send_telegram(msg)
     # Broadcast to SNS citizen alert topic for all subscribed ward residents
     first_text = next(iter(alert["texts"].values()), {"en": ""})
     notify.alert_citizens(f"Bio-Sentinel: {alert['kind']}", first_text.get("en", ""))
