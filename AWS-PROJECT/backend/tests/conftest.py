@@ -7,6 +7,11 @@ os.environ["USE_AWS_SNS"] = "0"  # keep SNS off during tests even if .env enable
 # to db.outbox whenever an ARN is set, regardless of USE_AWS_SNS).
 os.environ["SNS_TOPIC_ARN_OPERATORS"] = ""
 os.environ["SNS_TOPIC_ARN_CITIZENS"] = ""
+# Blank Razorpay keys so payments stay in mock mode and signatures use the dev
+# secret, even when real test keys live in backend/.env.
+os.environ["RAZORPAY_KEY_ID"] = ""
+os.environ["RAZORPAY_KEY_SECRET"] = ""
+os.environ["RAZORPAY_WEBHOOK_SECRET"] = ""
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import pytest
