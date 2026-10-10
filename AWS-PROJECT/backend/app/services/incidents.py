@@ -1,9 +1,9 @@
 import math
 import time
-# pyrefly: ignore [missing-import]
 from .. import config as C
 from ..store import db
-from . import notify
+from . import notify, toxicity
+# pyrefly: ignore [missing-import]
 from bio_sentinel_inference import STATION_METADATA
 
 LEVEL_RANK = {"NORMAL": 0, "ELEVATED_LEVEL_1": 1, "WARNING_LEVEL_2": 2, "CRITICAL_LEVEL_3": 3}
@@ -26,6 +26,10 @@ def report_severity(r):
     a, ph = r.get("ammonia_ppm"), r.get("ph")
     if a is not None:
         pts += 3 if a >= 3.0 else 2 if a >= 0.9 else 0
+        if r.get("ph") is not None:  # heat-aware: warm, alkaline water makes the same ammonia deadlier
+            temp = r.get("temperature_c") or C.DEFAULT_WATER_TEMP_C
+            uia = toxicity.unionized_ammonia(a, r["ph"], temp)
+            pts = max(pts, 3 if uia >= C.UIA_DANGER_MGL else 2 if uia >= C.UIA_WATCH_MGL else 0)
     if ph is not None and (ph < 6.5 or ph > 8.5):
         pts += 1
     pts += min(len(set(r.get("observations", [])) & C.BAD_OBSERVATIONS), 3)
@@ -98,9 +102,13 @@ def _raise(station_id, source, level, anomaly_type, forecast, report_id=None):
     return inc
 
 
-def on_telemetry(station_id, result):
+def on_telemetry(station_id, result, tox=None):
     if result["anomaly_detected"] and LEVEL_RANK.get(result["threat_level"], 0) >= 2:
         return _raise(station_id, "sensor", result["threat_level"], result["anomaly_type"],
+                      forecast_for(station_id, result))
+    if tox and tox["band"] == "DANGEROUS":
+        # Total ammonia may be under the legal limit, but heat and pH make it toxic.
+        return _raise(station_id, "sensor", "WARNING_LEVEL_2", "HEAT_AMMONIA_TOXICITY",
                       forecast_for(station_id, result))
     inc = open_incident_for(station_id)
     if inc and result["threat_level"] == "NORMAL" and "reports" not in inc["sources"]:

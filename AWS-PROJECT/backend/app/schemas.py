@@ -28,6 +28,7 @@ class ReportIn(BaseModel):
     source_type: Literal["river", "drain_outfall", "tap", "tanker"]
     ammonia_ppm: Optional[float] = Field(default=None, ge=0, le=50)
     ph: Optional[float] = Field(default=None, ge=0, le=14)
+    temperature_c: Optional[float] = Field(default=None, ge=0, le=60)
     observations: List[str] = []
     note: str = Field(default="", max_length=500)
     photo_key: Optional[str] = None
