@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+.local_users.json
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+tests/
+scratch/
+*.log
