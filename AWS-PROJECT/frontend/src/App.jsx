@@ -12,6 +12,7 @@ import GateControl from './views/GateControl'
 import Alerts from './views/Alerts'
 import Audit from './views/Audit'
 import logoMark from './assets/logo-mark.png'
+import DonationCheckout from './components/donation/DonationCheckout'
 
 const TABS = [
   { id: 'overview', label: 'Overview', c: Overview },
@@ -183,7 +184,17 @@ function Gate() {
   return <Portal />
 }
 
+const isDonateRoute = () =>
+  window.location.pathname.startsWith('/donate') || window.location.hash.startsWith('#/donate')
+
 export default function App() {
+  const [donate, setDonate] = useState(isDonateRoute)
+  useEffect(() => {
+    const sync = () => setDonate(isDonateRoute())
+    window.addEventListener('hashchange', sync); window.addEventListener('popstate', sync)
+    return () => { window.removeEventListener('hashchange', sync); window.removeEventListener('popstate', sync) }
+  }, [])
+  if (donate) return <DonationCheckout />
   return (
     <AuthProvider>
       <Gate />
