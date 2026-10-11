@@ -110,13 +110,10 @@ def handle_telegram_message(message: dict) -> bool:
         query = parts[1] if len(parts) > 1 else ""
         reply = format_ward_message(query)
     elif cmd == "/stations":
-        reply = (
-            "📍 <b>Monitored Station Nodes:</b>\n\n"
-            "1. <b>Panipat I</b> (68 km to intake)\n"
-            "2. <b>Panipat II</b> (50 km to intake)\n"
-            "3. <b>Sonipat</b> (38.5 km to intake)\n"
-            "4. <b>Palla</b> (Delhi Border · 16.5 km to intake)\n"
-            "5. <b>Wazirabad Intake Headworks</b> (0 km · Delhi Reservoir)"
+        from bio_sentinel_inference import STATION_METADATA
+        reply = "<b>Monitored Station Nodes:</b>\n\n" + "\n".join(
+            f"{i}. <b>{meta['name']}</b> ({meta['distance_km']:g} km to intake)"
+            for i, meta in enumerate(STATION_METADATA.values(), 1)
         )
     elif cmd == "/toxic":
         reply = (
