@@ -58,5 +58,13 @@ class Store:
             self.rate[key] = recent
             return False
 
+    def put_otp(self, key, data):
+        with self.lock:
+            self.otps[key] = data
+
+    def get_otp(self, key):
+        with self.lock:
+            return self.otps.get(key)
+
 
 db = Store()

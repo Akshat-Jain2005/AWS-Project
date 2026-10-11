@@ -78,9 +78,6 @@ export default function Auth({ initialRole = 'operator', initialMode = 'signin',
   const [teamRole, setTeamRole] = useState('Citizen Observer')
   const [stationUnit, setStationUnit] = useState('Panipat - Wazirabad Corridor')
 
-  // Developer access
-  const [showDev, setShowDev] = useState(false)
-  const [devToken, setDevToken] = useState('dev-operator-1')
 
   // Error & Status feedback
   const [formError, setFormError] = useState(null)
@@ -127,7 +124,7 @@ export default function Auth({ initialRole = 'operator', initialMode = 'signin',
       if (err.status === 403 || err.message?.includes('No valid operator') || err.message?.includes('No valid reporter')) {
         setStaffOtpError(err.message || `No valid ${role} email. This email is not registered as an authorized ${role}.`)
       } else if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError') || err.message?.includes('Bad Gateway')) {
-        setStaffOtpError('Backend server is offline (localhost:8000). Use Developer Access below for local testing.')
+        setStaffOtpError('Backend server is offline (localhost:8000). Please ensure server is running.')
       } else {
         setStaffOtpError(err.message || 'Failed to send verification code. Please check your email address.')
       }
@@ -156,7 +153,7 @@ export default function Auth({ initialRole = 'operator', initialMode = 'signin',
       await staffLogin(role, email.trim(), password, code.trim())
     } catch (err) {
       if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError') || err.message?.includes('Bad Gateway')) {
-        setFormError('Backend server is offline (localhost:8000). Use Developer Access below for local testing.')
+        setFormError('Backend server is offline (localhost:8000). Please ensure server is running.')
       } else {
         setFormError(err.message || 'Incorrect email, password, or authenticator code.')
       }
@@ -177,9 +174,10 @@ export default function Auth({ initialRole = 'operator', initialMode = 'signin',
 
     try {
       await loginWithPassword(email.trim(), password)
+      if (onBack) onBack()
     } catch (err) {
       if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError') || err.message?.includes('Bad Gateway')) {
-        setFormError('Backend server is offline (localhost:8000). Use Developer Access below for local testing.')
+        setFormError('Backend server is offline (localhost:8000). Please ensure server is running.')
       } else {
         setFormError(err.message || 'Incorrect email or password.')
       }
@@ -694,45 +692,6 @@ export default function Auth({ initialRole = 'operator', initialMode = 'signin',
                 </form>
             </div>
           )}
-
-          {/* Developer Access Accordion (Never blocks local testing) */}
-          <div className="site-dev-section">
-            <button
-              type="button"
-              className="site-dev-toggle"
-              aria-expanded={showDev}
-              onClick={() => setShowDev((v) => !v)}
-            >
-              {showDev ? 'Hide developer access' : 'Developer access'}
-            </button>
-            {showDev && (
-              <form
-                className="site-field"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  if (devToken.trim() && !busy) devSignIn(devToken.trim())
-                }}
-              >
-                <span>Operator token (local / development)</span>
-                <div className="site-input-wrap">
-                  <input
-                    type="password"
-                    value={devToken}
-                    autoComplete="off"
-                    placeholder="dev-operator-1"
-                    onChange={(e) => setDevToken(e.target.value)}
-                  />
-                  <button
-                    type="submit"
-                    className="site-ticket"
-                    disabled={!devToken.trim() || busy}
-                  >
-                    Enter
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
 
           {/* Return to overview */}
           {onBack && (

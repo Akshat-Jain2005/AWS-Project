@@ -88,10 +88,10 @@ export function AuthProvider({ children }) {
     }
   }, [signIn])
 
-  const register = useCallback(async ({ name, email, password }) => {
+  const register = useCallback(async ({ name, email, password, phone, alt_phone }) => {
     setBusy(true); setNotice(null)
     try {
-      const { token } = await api('/auth/register', { method: 'POST', auth: false, body: { name, email, password } })
+      const { token } = await api('/auth/register', { method: 'POST', auth: false, body: { name, email, password, phone, alt_phone } })
       await signIn(token)
     } catch (error) {
       setBusy(false); setNotice(error.message); throw error
