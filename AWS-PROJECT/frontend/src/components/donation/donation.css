@@ -1,0 +1,14 @@
+/* Tailwind for the donation flow only — no Preflight, so the existing
+   console/portal styles are untouched. Utilities are marked important so
+   global element rules in index.css cannot override them. */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) important;
+
+@source "./";
+
+@keyframes bs-pop { 0% { transform: scale(.6); opacity: 0 } 70% { transform: scale(1.08) } 100% { transform: scale(1); opacity: 1 } }
+@keyframes bs-fade { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+.bs-pop { animation: bs-pop .45s cubic-bezier(.2,.9,.3,1.2) both; }
+.bs-fade { animation: bs-fade .3s ease-out both; }
+.bs-root, .bs-root * { box-sizing: border-box; }
+.bs-root input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
