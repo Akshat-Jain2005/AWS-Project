@@ -14,11 +14,13 @@ from app.main import app
 
 
 @pytest.fixture
-def ddb(monkeypatch):
+def ddb(monkeypatch, tmp_path):
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
     monkeypatch.setenv("AWS_SESSION_TOKEN", "testing")
     monkeypatch.setattr(config, "DDB_ENDPOINT_URL", None)
+    monkeypatch.setattr(accounts, "_USERS_FILE", str(tmp_path / ".test_users.json"))
+    monkeypatch.setattr(accounts, "_local_users", {})
     accounts._resource = None
     with mock_aws():
         c = boto3.client("dynamodb", region_name=config.AWS_REGION)
@@ -181,10 +183,10 @@ def test_staff_account_cannot_use_citizen_login(client):
     assert r.status_code == 403
 
 
-def test_reporter_is_not_operator(client):
+def test_reporter_can_access_operator_routes(client):
     email, password, secret = _provision(role="reporter", email="rep@djb.example")
     ok = client.post("/auth/staff-login", json={
         "role": "reporter", "email": email, "password": password, "code": totp.now_code(secret)})
     headers = {"Authorization": f"Bearer {ok.json()['token']}"}
     assert client.get("/me", headers=headers).json()["role"] == "reporter"
-    assert client.get("/stations", headers=headers).status_code == 403  # operator-only route
+    assert client.get("/stations", headers=headers).status_code == 200  # equal staff access for operator and reporter
