@@ -1,4 +1,5 @@
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 
 // The console talks to the FastAPI backend. In dev we proxy the API paths it
@@ -13,7 +14,7 @@ const API_PATHS = [
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
     strictPort: true,
@@ -21,8 +22,16 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
       'Referrer-Policy': 'no-referrer-when-downgrade',
     },
-    proxy: Object.fromEntries(
-      API_PATHS.map((p) => [p, { target: API_TARGET, changeOrigin: true }]),
-    ),
+    proxy: {
+      ...Object.fromEntries(
+        API_PATHS.map((p) => [p, { target: API_TARGET, changeOrigin: true }]),
+      ),
+      // Lets the checkout verify the Razorpay key before opening the modal.
+      '/rzp-check': {
+        target: 'https://api.razorpay.com',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/rzp-check/, ''),
+      },
+    },
   },
 })

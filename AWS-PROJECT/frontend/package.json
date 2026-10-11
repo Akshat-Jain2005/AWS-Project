@@ -11,16 +11,20 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "lucide-react": "^1.55.0",
     "maplibre-gl": "^4.7.1",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
     "oxlint": "^1.81.0",
+    "tailwindcss": "^4.3.3",
     "vite": "^8.3.0"
   }
 }
