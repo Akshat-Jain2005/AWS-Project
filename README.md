@@ -924,7 +924,7 @@ Please open an issue first for substantial changes (new storage backend, auth ch
 
 ## 27. License & Acknowledgements
 
-**License:** *No license file is currently included in the repository.* The repository owner must choose the intended license; this audit does not assign one.
+**License:** This project is licensed under the [MIT License](LICENSE).
 
 **Acknowledgements**
 - Built for the **AWS Environmental Hackathon 2026** (Heat & Water).
