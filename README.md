@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/33309215/README.md)
 <div align="center">
 
 # 🛡️ Bio-Sentinel
@@ -13,7 +12,7 @@
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white)
 ![LightGBM](https://img.shields.io/badge/LightGBM-classifier-brightgreen?style=flat-square)
-![AWS](https://img.shields.io/badge/AWS-Lambda%20%7C%20DynamoDB%20%7C%20SNS%20%7C%20Bedrock%20%7C%20Location-FF9900?style=flat-square&logo=amazonaws&logoColor=white)
+![AWS](https://img.shields.io/badge/AWS-EC2%20%7C%20DynamoDB%20%7C%20SNS%20%7C%20Bedrock%20%7C%20Location-FF9900?style=flat-square&logo=amazonaws&logoColor=white)
 
 🌐 **Live site:** <https://d1lidy5nyd64my.cloudfront.net/>
 
@@ -66,7 +65,7 @@ The backend runs an ML ensemble to decide whether the fleas are behaving normall
 | | |
 |---|---|
 | **Live URL** | <https://d1lidy5nyd64my.cloudfront.net/> |
-| **Backend** | FastAPI (Python 3.12), packaged for AWS Lambda via Mangum |
+| **Backend** | FastAPI on EC2 behind Nginx; an optional Lambda/Mangum package also exists |
 | **Frontend** | React 19 + Vite 8 + Tailwind CSS 4 + MapLibre GL |
 | **ML** | LightGBM classifiers + engineered kinematic features, with a deterministic safety arbiter |
 | **Cloud** | DynamoDB, SNS, Bedrock, Amazon Location Service, S3, SSM, CloudFront |
@@ -166,7 +165,7 @@ Living organisms do not have that blind spot. *Daphnia magna* react to **any** t
         └───────────────────────────────┬────────────────────────────┘
                                         ▼
         ┌────────────────────────────────────────────────────────────┐
-        │  FastAPI app (Mangum → AWS Lambda container image)         │
+        │  FastAPI app (Nginx → Uvicorn on EC2)         │
         │  routers: monitoring · reports · subscribers · payments ·  │
         │           operator · toxicity · accounts                   │
         │  services: incidents · alerts · notify · llm · payments ·  │
@@ -201,7 +200,7 @@ Five stations are defined along the Yamuna threat corridor, in hydrological orde
 | `STATION_04_PALLA` | Palla Delhi-Haryana Entry Point | 16.5 km | 28.83, 77.20 |
 | `STATION_05_WAZIRABAD` | Wazirabad DJB Intake Reservoir | 0 km | 28.71, 77.23 |
 
-> ¹ See [Known Limitations](#24-known-limitations--notes): the frontend currently labels this station `50 km`.
+> ¹ This is the configured forecast distance, not a verified geographic measurement. The dashboard and Telegram station list now use the backend metadata instead of a conflicting hard-coded 50 km label.
 
 Station coordinates are **approximate placeholders**: replace `STATION_COORDS` in `backend/app/config.py` with real deployment locations.
 
@@ -322,7 +321,7 @@ UIA  = total_ammonia_ppm × f             # mg/L
 
 ### Sign-in methods
 - **Google Identity Services**: the ID token is verified against `GOOGLE_CLIENT_ID`. Operator access requires `email_verified`, an authoritative domain (`gmail.com` or a matching Workspace `hd` claim) **and** an entry in `OPERATOR_ALLOWLIST` (exact email, or `@domain` entries).
-- **Email + password**: PBKDF2-HMAC-SHA256 with per-user salt, constant-time comparison, stored in DynamoDB.
+- **Email + password**: PBKDF2-HMAC-SHA256 with per-user salt, constant-time comparison, stored preferentially in DynamoDB, with a local JSON fallback on storage errors.
 - **Staff login** (`/auth/staff-login`): work email + password + **TOTP authenticator code or email OTP**.
 - **Invite-only provisioning**: `python provision_staff.py operator ops@example.com "Jane"` prints the TOTP secret and `otpauth://` URI once.
 - **DEV_MODE tokens**: `dev-operator-1`, `dev-operator-2`, `dev-reporter` (accepted **only** when `DEV_MODE=1`).
@@ -442,7 +441,7 @@ Bio-Sentinel/
 
 **Frontend:** React 19 · Vite 8 · Tailwind CSS 4 · MapLibre GL 4 · `@google/model-viewer` · lucide-react · qrcode.react · Razorpay Checkout · oxlint · Playwright
 
-**AWS:** Lambda (container image) · CloudFront · DynamoDB · SNS · Bedrock · Location Service (V2 maps) · S3 · SSM Parameter Store
+**AWS:** EC2 (current backend) · CloudFront · DynamoDB · SNS · Bedrock · Location Service (V2 maps) · S3 · SSM Parameter Store
 
 **Testing:** pytest · httpx / FastAPI TestClient · moto (DynamoDB mock) · Playwright
 
@@ -485,7 +484,7 @@ uvicorn app.main:app --reload --port 8000
 Open <http://localhost:8000/docs> for the interactive OpenAPI UI. Health check: `GET /` → `{"service": "Bio-Sentinel Core Engine", "status": "ONLINE", ...}`.
 
 ### 15.3 (Optional) DynamoDB Local for email/password accounts
-Email/password accounts require DynamoDB (there is no in-memory fallback).
+Email/password accounts prefer DynamoDB. The current code falls back to process memory and `backend/.local_users.json` on DynamoDB failures; this fallback is not shared between instances and writes can fail. Use DynamoDB for deployment and monitor account-store errors.
 ```bash
 docker run -d -p 8000:8000 amazon/dynamodb-local     # use another host port if 8000 is taken by the API
 # in backend/.env:
@@ -800,7 +799,7 @@ If you enabled `SENSOR_API_KEY`, add the `X-Api-Key` header to the simulator's r
 cd AWS-PROJECT/backend
 pytest -q
 ```
-- ~75 test functions across API behaviour, accounts (moto-backed DynamoDB), Google auth, audit-chain integrity, map proxy, toxicity maths and dashboard integrations.
+- Latest local audit: **94 tests passed** (12 October 2026), including API behaviour, accounts, Google auth, audit-chain helpers, map proxy, toxicity, dashboard integrations and Lambda adapter startup. Five scikit-learn warnings report loading a model saved with 1.5.1 into runtime 1.9.1; this is not an accuracy validation. The Lambda container itself was not built.
 - `conftest.py` forces `DEV_MODE=1`, disables SNS, blanks Razorpay/Google/allowlist settings, and resets the in-memory store before **every** test, so the suite is hermetic and never calls the network.
 
 ### Frontend (Playwright)
@@ -821,46 +820,43 @@ npm run lint      # oxlint
 
 ## 22. Deployment on AWS
 
-The live deployment is served from CloudFront: <https://d1lidy5nyd64my.cloudfront.net/>. The repository contains the pieces to reproduce a similar setup.
+Verified with read-only AWS API calls on 12 October 2026 (Asia/Kolkata), account `056176271096`:
 
-### Backend → Lambda container image
-`backend/Dockerfile` builds on `public.ecr.aws/lambda/python:3.12`, installs `requirements.txt`, copies the app and uses `handler.lambda_handler` (Mangum wrapping the FastAPI app).
+| Component | Observed configuration |
+|---|---|
+| Public URL | <https://d1lidy5nyd64my.cloudfront.net/> |
+| CloudFront | Distribution `E3UAFMAHX2RNXN`, enabled, status `Deployed` |
+| Frontend origin | S3 website endpoint `biosentinel-web-056176271096.s3-website-ap-southeast-2.amazonaws.com` |
+| API origin | EC2 public DNS `ec2-13-238-143-38.ap-southeast-2.compute.amazonaws.com` |
+| EC2 backend | `i-07270d5f23b131df5`, `BioSentinel-Backend-Prod`, running, `t3.small`, `ap-southeast-2` |
+| DynamoDB | Table `bio-sentinel` exists in `ap-southeast-2`; ensure `DDB_TABLE_NAME=bio-sentinel` in deployment configuration |
+| Lambda | No functions returned in `ap-southeast-2`; Lambda is not this CloudFront distribution's API origin |
 
-```bash
-cd AWS-PROJECT/backend
-docker build -t bio-sentinel-api .
-# push to ECR, create a Lambda function from the image, front it with a
-# Function URL or API Gateway
-```
-> `handler.py` imports `mangum`, which must be present in the image. See [Known Limitations](#24-known-limitations--notes).
+CloudFront defaults to the S3 frontend and routes API prefixes including `/auth*`, `/status*`, `/telemetry*`, `/stations*`, `/reports*`, `/donations*` and `/map*` to the EC2 origin. This provides the same-origin API calls expected by the frontend. The checked-in Dockerfile describes an alternative Lambda packaging path, not the currently observed deployment.
 
-Provisioning checklist:
-1. **DynamoDB** table via `python create_table.py` (or IaC with the schema in §19).
-2. **Lambda env vars** from §16 (`DEV_MODE=0`, `SESSION_SECRET`, `GOOGLE_CLIENT_ID`, `OPERATOR_ALLOWLIST`, `CORS_ORIGINS`, …).
-3. **IAM**: DynamoDB table access, `sns:Publish`, `bedrock:InvokeModel`/`Converse`, S3 put on the photo bucket.
-4. **SNS**: sandbox exit and sender-ID registration for India as required; create operator/citizen topics.
-5. **Amazon Location**: create a public API key scoped to geo-maps; set `LOCATION_API_KEY`.
-6. **S3**: private bucket for report photos with POST CORS for your frontend origin → `REPORT_PHOTO_BUCKET`.
-7. **Staff**: `python provision_staff.py operator you@example.com "Your Name"` and enrol the TOTP secret.
-8. *(Optional)* Register the Telegram webhook to `/telegram/webhook`.
+The local `AWS-PROJECT/scratch/userdata.sh` describes Nginx proxying to Uvicorn on port 8000, with separate systemd services for FastAPI and Telegram polling. This script supports the EC2 architecture but does not prove the running instance has applied every line. No private runtime environment or secrets were retrieved in this audit. Access to other-region inventories was denied; the observations above are scoped to the actual CloudFront origins and Sydney resources.
 
-### Frontend → S3 + CloudFront
+### Frontend build
+
 ```bash
 cd AWS-PROJECT/frontend
-npm ci && npm run build        # outputs dist/
-# upload dist/ to an S3 origin served by CloudFront
+npm ci
+npm run build
 ```
-The SPA calls the API with **relative paths**, so in production the API must be reachable **same-origin**, typically by adding CloudFront behaviours that route the API prefixes (`/status`, `/telemetry`, `/stations`, `/auth/*`, `/map/*`, `/donations/*`, …) to the Lambda origin while everything else serves the static bucket. These are the same paths listed in `vite.config.js`'s `API_PATHS`.
 
-### Production hardening checklist
-- [ ] `DEV_MODE=0`
-- [ ] Strong `SESSION_SECRET` set
-- [ ] `SENSOR_API_KEY` set and baked into edge units
-- [ ] `OPERATOR_ALLOWLIST` restricted to real operators
-- [ ] `CORS_ORIGINS` set to the real origin(s)
-- [ ] Razorpay live keys + webhook secret
-- [ ] Persist incident/alert state (see limitation on in-memory state)
-- [ ] Rotate any credentials that have ever been committed
+Upload `dist/` to the frontend bucket and invalidate the relevant CloudFront paths when deploying. Local fixes described in §24 have not been pushed to the live instance or bucket as part of this audit.
+
+### Optional Lambda packaging
+
+`backend/Dockerfile` uses `public.ecr.aws/lambda/python:3.12` and `handler.lambda_handler`. `mangum` is now declared in `requirements.txt`; a `.dockerignore` excludes local credentials and account files. This adapter is tested locally, but the Docker image has not been built or deployed during this audit. Operational state must be made persistent before using multiple Lambda execution environments.
+
+### Remaining production work
+
+- Persist operational state before restarts or horizontal scaling; see §24.
+- Replace sample coordinates, ward schedules and forecast distances with validated configuration.
+- Confirm deployed secret configuration, provider permissions and end-to-end delivery independently; an AWS resource existing does not verify those services.
+- Configure Google authorized JavaScript origins for the deployed frontend.
+- Confirm the desired license with the repository owner.
 
 ---
 
@@ -885,18 +881,17 @@ Navigation is state-based (no router). The public dashboard and donation flows s
 
 ## 24. Known Limitations & Notes
 
-Being upfront so contributors and judges are not surprised:
-
-1. **Operational state is in-memory.** `app/store.py` keeps stations, incidents, reports, alerts, audit and gate state in process memory (thread-locked). On Lambda this resets on cold start and is not shared across concurrent instances. A DynamoDB store implementation (`store_dynamodb.py`) and a migration plan exist but are **not yet wired** as the active backend. Only **user accounts** are persisted in DynamoDB.
-2. **`mangum` is not listed in `requirements.txt`**, yet `handler.py` imports it. Add `mangum` before building the Lambda image.
-3. **`backend/server.py` is a legacy v1 prototype** (hard-coded Razorpay test key, mocked payment verification, `allow_origins=["*"]`). The real application is `app/main.py`: do not deploy `server.py`.
-4. **Synthetic training data.** Model quality on real Daphnia footage is unvalidated; the safety arbiter exists precisely because of this.
-5. **Un-ionized ammonia thresholds are starting values**, not regulatory limits.
-6. **Station 02 distance mismatch:** the backend uses `18.5 km`, while the operator console label shows `50 km`. Reconcile before presenting numbers publicly.
-7. **Placeholder data:** station coordinates, ward rationing schedules, the `1420` community baseline in `/subscribe/config`, and the `DEFICIT_MGD` figure should be replaced with verified real-world values.
-8. **Large binary assets** (two ~18 MB `.glb` files that appear to be duplicates, a ~10 MB sensor model, the dataset CSV and the model bundle) bloat the repo; consider Git LFS or CDN hosting and removing the duplicate.
-9. **`scratch/` scripts** are one-off refactor helpers and are not part of the runtime.
-10. **Simulator** posts without an API key by default; add the header if `SENSOR_API_KEY` is enforced.
+1. **Operational state is still in memory.** `app/store.py` holds telemetry, incidents, reports, subscribers, alerts, donations, audit and gate state. EC2 process restarts lose it; workers do not share it. `store_dynamodb.py` is not wired into the active runtime. Migrating state is still required.
+2. **Account persistence has a fallback.** Accounts prefer DynamoDB but fall back to memory and `backend/.local_users.json` on failures. The module docstring's claim that no fallback exists is stale. A local file is neither shared nor guaranteed durable.
+3. **Mangum dependency fixed locally.** `requirements.txt` now includes Mangum; the actual live backend uses EC2. The Lambda adapter remains an optional packaging path.
+4. **Prototype entry point fixed locally.** `backend/server.py` now imports `app.main.app`. Both entry points use the same authentication and payment checks; the hard-coded test key and unconditional successful payment response were removed.
+5. **Synthetic training data.** The generator samples numerical distributions. No new training run or real-world accuracy validation was performed in this audit. The un-ionized ammonia thresholds remain configurable starting values.
+6. **Distance mismatch fixed locally; calibration remains open.** Public status now exposes backend `distance_km`; dashboard and Telegram read that metadata. Station 02 remains configured at 18.5 km. That distance is smaller than downstream Sonipat's 38.5 km, so the corridor's physical distances still need verification before operational use.
+7. **Placeholder configuration remains.** Station coordinates, ward schedules and the 110 MGD deficit are sample/assumed values. The artificial 1,420-subscriber minimum was removed locally; counts now reflect verified, non-opted-out records in the runtime store.
+8. **Duplicate assets confirmed.** `yamuna_watch_textured.glb` and `yamuna_watch_textured (5).glb` are byte-identical: 18,372,248 bytes each, SHA-256 `2701691d0cf5c119d140be3b58d5c3bb19f50956486bdcaf65c0c979aba9fecf`. Only the former is referenced by frontend code. A separate 9,802,252-byte `sensor-model.glb` is different. No Git history was rewritten or model asset removed in this audit.
+9. **Deployment distinction.** The live CloudFront API origin is EC2, not Lambda. Repository fixes are local until explicitly deployed and verified.
+10. **Model/runtime mismatch.** Local tests warn that the saved estimators use scikit-learn 1.5.1 while the installed runtime is 1.9.1. Align the serving environment with the trained artifact or retrain and validate it before relying on predictions.
+11. **No license file found.** License selection is an owner decision; none was added by this audit.
 
 ---
 
@@ -929,7 +924,7 @@ Please open an issue first for substantial changes (new storage backend, auth ch
 
 ## 27. License & Acknowledgements
 
-**License:** *No license file is currently included in the repository.* Add one (for example MIT or Apache-2.0) before accepting external contributions or reuse.
+**License:** *No license file is currently included in the repository.* The repository owner must choose the intended license; this audit does not assign one.
 
 **Acknowledgements**
 - Built for the **AWS Environmental Hackathon 2026** (Heat & Water).
