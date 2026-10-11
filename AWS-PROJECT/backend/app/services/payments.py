@@ -20,9 +20,9 @@ def _webhook_secret():
 
 
 def mock_mode():
-    # DEV_MODE always stays mock (test / offline isolation), even if real keys
-    # are present in the environment. Otherwise mock until both keys are set.
-    return C.DEV_MODE or not (C.RAZORPAY_KEY_ID and C.RAZORPAY_KEY_SECRET)
+    # If valid Razorpay keys are configured, use real Razorpay API.
+    # Otherwise fallback to mock mode.
+    return not (C.RAZORPAY_KEY_ID and C.RAZORPAY_KEY_SECRET)
 
 
 def create_order(req, campaign_id):

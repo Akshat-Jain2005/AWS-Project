@@ -1,4 +1,5 @@
 import json
+import requests
 
 from fastapi import APIRouter, HTTPException, Request
 from .. import config as C
@@ -47,6 +48,40 @@ def verify_payment(body: PaymentVerifyIn):
     entry, created = payments.record_payment(body.order_id, body.payment_id)
     return {"verified": True, "status": "PAYMENT_RECORDED", "order_id": body.order_id,
             "amount_inr": entry["amount_inr"], "new": created}
+
+
+@router.get("/donations/order/{order_id}/status")
+def get_order_status(order_id: str):
+    if order_id not in db.donations:
+        raise HTTPException(404, "Unknown order")
+    d = db.donations[order_id]
+    
+    # If order is created but not marked paid, check Razorpay directly if not mock
+    if d["status"] != "paid" and not payments.mock_mode():
+        try:
+            r = requests.get(
+                f"https://api.razorpay.com/v1/orders/{order_id}/payments",
+                auth=(C.RAZORPAY_KEY_ID, C.RAZORPAY_KEY_SECRET),
+                timeout=5,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                items = data.get("items", [])
+                captured = next((p for p in items if p.get("status") == "captured"), None)
+                if captured:
+                    payments.record_payment(order_id, captured["id"])
+                    d = db.donations[order_id]
+        except Exception:
+            pass
+
+    return {
+        "order_id": order_id,
+        "status": d.get("status"),
+        "payment_id": d.get("payment_id"),
+        "amount_inr": d.get("amount_inr"),
+        "donor_name": d.get("donor_name"),
+        "donor_email": d.get("donor_email"),
+    }
 
 
 @router.post("/donations/webhook")
