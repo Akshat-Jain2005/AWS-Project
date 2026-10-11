@@ -1,7 +1,7 @@
 import hardwareNodeImg from '../assets/hardware-node.jpg'
 import Biomonitor3DViewer from './Biomonitor3DViewer'
 
-export default function Home({ onOpenAuth, onOpenDashboard }) {
+export default function Home({ onOpenAuth, onOpenDashboard, onOpenDonate }) {
   const scrollToDashboard = () => {
     if (onOpenDashboard) return onOpenDashboard()
     document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })
@@ -324,6 +324,14 @@ export default function Home({ onOpenAuth, onOpenDashboard }) {
                   onClick={scrollToDashboard}
                 >
                   Open live dashboard →
+                </button>
+                <button
+                  type="button"
+                  className="btn-role-portal btn-portal-outline"
+                  onClick={onOpenDonate}
+                  id="landing-donate-btn"
+                >
+                  Donate to clean water relief 💧
                 </button>
               </div>
             </div>

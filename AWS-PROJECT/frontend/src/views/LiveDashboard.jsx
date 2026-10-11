@@ -11,7 +11,7 @@ import ToxicitySimulator from './ToxicitySimulator'
 import { WARDS } from '../wards'
 import logoMark from '../assets/logo-mark.png'
 
-export default function LiveDashboard({ onBack, onOpenAuth }) {
+export default function LiveDashboard({ onBack, onOpenAuth, user, onSignOut }) {
   const feed = usePoll('/status', 5000)
   const reports = usePoll('/reports', 10000)
   const healthPoll = usePoll('/river-health/yamuna-panipat', 8000)
@@ -28,6 +28,8 @@ export default function LiveDashboard({ onBack, onOpenAuth }) {
   const handleStationSelect = (sid) => {
     setSelectedStationId(sid)
   }
+
+  const member = Boolean(user?.role && user.role !== 'public')
 
   return (
     <div className="live-dash">
@@ -50,16 +52,32 @@ export default function LiveDashboard({ onBack, onOpenAuth }) {
             </span>
           </div>
           <div className="site-nav-actions">
-            <button
-              type="button"
-              className="site-nav-login"
-              onClick={() => (onOpenAuth ? onOpenAuth('operator') : onBack?.())}
-            >
-              Operator login
-            </button>
-            <button type="button" className="site-nav-dashboard" onClick={onBack}>
-              ← Back to site
-            </button>
+            {member ? (
+              <>
+                <span className="site-userchip">{user.name}</span>
+                {onSignOut && (
+                  <button type="button" className="site-nav-login" onClick={onSignOut}>
+                    Sign out
+                  </button>
+                )}
+                <button type="button" className="site-nav-dashboard" onClick={onBack}>
+                  ← Back to site
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="site-nav-login"
+                  onClick={() => (onOpenAuth ? onOpenAuth('operator') : onBack?.())}
+                >
+                  Operator login
+                </button>
+                <button type="button" className="site-nav-dashboard" onClick={onBack}>
+                  ← Back to site
+                </button>
+              </>
+            )}
           </div>
         </nav>
       </header>
