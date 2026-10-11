@@ -9,3 +9,4 @@ __pycache__/
 samconfig.toml
 *.pem
 .DS_Store
+.local_users.json

@@ -99,7 +99,9 @@ class RulesIn(BaseModel):
 class RegisterIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     email: str = Field(min_length=3, max_length=254)
-    password: str = Field(min_length=8, max_length=200)
+    password: str = Field(min_length=6, max_length=200)
+    phone: Optional[str] = None
+    alt_phone: Optional[str] = None
 
     @field_validator("email")
     @classmethod
@@ -129,6 +131,29 @@ class StaffLoginIn(BaseModel):
     email: str = Field(min_length=3, max_length=254)
     password: str = Field(min_length=1, max_length=200)
     code: str = Field(min_length=6, max_length=12)
+
+    @field_validator("email")
+    @classmethod
+    def _lower_email(cls, v: str) -> str:
+        return v.strip().lower()
+
+
+class EmailOtpIn(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    role: Optional[Literal["operator", "reporter", "citizen"]] = None
+
+    @field_validator("email")
+    @classmethod
+    def _valid_email(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not _EMAIL_RE.match(v):
+            raise ValueError("Enter a valid email address")
+        return v
+
+
+class EmailOtpVerifyIn(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    code: str = Field(min_length=4, max_length=10)
 
     @field_validator("email")
     @classmethod

@@ -10,6 +10,9 @@ touches the network and the app stays importable without AWS configured.
 """
 import hashlib
 import hmac
+import json
+import logging
+import os
 import secrets
 import time
 
@@ -18,10 +21,36 @@ from botocore.exceptions import ClientError
 
 from . import config as C
 
+log = logging.getLogger("bio.accounts")
+
 _PBKDF2_ROUNDS = 600_000
 _PBKDF2_ALGO = "pbkdf2_sha256"
 
 _resource = None
+
+_USERS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".local_users.json"))
+
+
+def _load_local_users() -> dict:
+    try:
+        if os.path.exists(_USERS_FILE):
+            with open(_USERS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        log.warning("Could not read local users file: %s", e)
+    return {}
+
+
+def _save_local_users() -> None:
+    try:
+        with open(_USERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(_local_users, f, indent=2)
+    except Exception as e:
+        log.warning("Could not write local users file: %s", e)
+
+
+_local_users = _load_local_users()
+
 
 
 class AccountError(Exception):
@@ -72,14 +101,29 @@ def verify_password(record: dict, password: str) -> bool:
 
 def get_user(email: str):
     """Return the account record for ``email``, or None."""
-    r = _table().get_item(Key={"pk": _pk(email), "sk": "META"})
-    item = r.get("Item")
-    return dict(item) if item else None
+    norm = _norm(email)
+    try:
+        r = _table().get_item(Key={"pk": _pk(norm), "sk": "META"})
+        item = r.get("Item")
+        if item:
+            return dict(item)
+    except Exception as e:
+        log.warning("DynamoDB get_user failed (%s): %s", email, e)
+    if norm in _local_users:
+        return _local_users[norm]
+    # Check disk file
+    disk_users = _load_local_users()
+    if norm in disk_users:
+        _local_users[norm] = disk_users[norm]
+        return disk_users[norm]
+    return None
 
 
-def create_user(email: str, name: str, password: str) -> dict:
+def create_user(email: str, name: str, password: str, *, phone: str = "", alt_phone: str = "") -> dict:
     """Create a new member account. Raises UserExists if the email is taken."""
     email = _norm(email)
+    if get_user(email):
+        raise UserExists(email)
     item = {
         "pk": _pk(email), "sk": "META",
         "email": email, "name": (name or "").strip() or email,
@@ -87,12 +131,22 @@ def create_user(email: str, name: str, password: str) -> dict:
         "email_verified": False, "operator_eligible": False,
         **hash_password(password),
     }
+    if phone:
+        item["phone"] = phone
+    if alt_phone:
+        item["alt_phone"] = alt_phone
+
     try:
         _table().put_item(Item=item, ConditionExpression="attribute_not_exists(pk)")
     except ClientError as e:
         if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
             raise UserExists(email)
-        raise
+        log.warning("DynamoDB put_item failed, persisting to local store: %s", e)
+    except Exception as e:
+        log.warning("DynamoDB put_item failed, persisting to local store: %s", e)
+
+    _local_users[email] = item
+    _save_local_users()
     return item
 
 
@@ -110,7 +164,12 @@ def set_password(email: str, name: str, password: str, *, operator_eligible: boo
         "operator_eligible": bool(operator_eligible) or bool(existing.get("operator_eligible")),
         **hash_password(password),
     }
-    _table().put_item(Item=item)
+    try:
+        _table().put_item(Item=item)
+    except Exception as e:
+        log.warning("DynamoDB set_password failed, persisting to local store: %s", e)
+    _local_users[email] = item
+    _save_local_users()
     return item
 
 
@@ -131,5 +190,11 @@ def create_staff(email: str, name: str, password: str, role: str):
         "role": role, "totp_secret": secret, "email_verified": True, "operator_eligible": False,
         **hash_password(password),
     }
-    _table().put_item(Item=item)
+    try:
+        _table().put_item(Item=item)
+    except Exception as e:
+        log.warning("DynamoDB create_staff failed, persisting to local store: %s", e)
+    _local_users[email] = item
+    _save_local_users()
     return item, secret
+

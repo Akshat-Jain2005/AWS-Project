@@ -116,8 +116,8 @@ def current_user(authorization: str = Header(default="")):
 def require_operator(user=Depends(current_user)):
     if user["role"] == "public":
         raise HTTPException(401, "Login required")
-    if user["role"] != "operator":
-        raise HTTPException(403, "Operator access only")
+    if user["role"] not in ("operator", "reporter"):
+        raise HTTPException(403, "Operator or verified reporter access only")
     return user
 
 
