@@ -12,11 +12,11 @@ const CORRIDOR_BOUNDS = [
 const CORRIDOR_CENTER = [77.08, 29.07]
 
 const STATION_INFO = {
-  STATION_01_PANIPAT: { short: 'Panipat I', dist: '68 km to intake' },
-  STATION_02_PANIPAT: { short: 'Panipat II', dist: '50 km to intake' },
-  STATION_03_SONIPAT: { short: 'Sonipat', dist: '38.5 km to intake' },
-  STATION_04_PALLA: { short: 'Palla', dist: '16.5 km to intake' },
-  STATION_05_WAZIRABAD: { short: 'Wazirabad Intake', dist: 'Intake point (0 km)' },
+  STATION_01_PANIPAT: { short: 'Panipat I' },
+  STATION_02_PANIPAT: { short: 'Panipat II' },
+  STATION_03_SONIPAT: { short: 'Sonipat' },
+  STATION_04_PALLA: { short: 'Palla' },
+  STATION_05_WAZIRABAD: { short: 'Wazirabad Intake' },
 }
 
 export default function CorridorMap({
@@ -168,7 +168,7 @@ export default function CorridorMap({
       const isIncident = incident?.station_id === st.station_id
       const isSelected = selectedStationId === st.station_id
       const isIntake = st.station_id === 'STATION_05_WAZIRABAD'
-      const info = STATION_INFO[st.station_id] || { short: st.name, dist: '' }
+      const info = STATION_INFO[st.station_id] || { short: st.name }
 
       // Marker element
       const el = document.createElement('div')
@@ -278,7 +278,7 @@ export default function CorridorMap({
             <div className="popup-facts">
               <div>
                 <span className="fact-k">DISTANCE TO INTAKE</span>
-                <span className="fact-v">{STATION_INFO[selectedStation.station_id]?.dist || '—'}</span>
+                <span className="fact-v">{Number.isFinite(selectedStation.distance_km) ? `${selectedStation.distance_km} km to intake` : 'Distance unavailable'}</span>
               </div>
               <div>
                 <span className="fact-k">AMMONIA BAND</span>

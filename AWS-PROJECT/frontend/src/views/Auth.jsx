@@ -352,7 +352,7 @@ export default function Auth({ initialRole = 'operator', initialMode = 'signin',
                     type="email"
                     autoComplete="email"
                     value={email}
-                    placeholder={role === 'operator' ? 'jakshat0510@gmail.com' : 'you@djb.example'}
+                    placeholder={role === 'operator' ? 'operator@djb.example' : 'reporter@djb.example'}
                     onChange={(e) => {
                       setEmail(e.target.value)
                       setStaffOtpSent(false)

@@ -43,7 +43,7 @@ def subscribe_config():
             "sms_type": C.SNS_SMS_TYPE,
         },
         "community_metrics": {
-            "active_subscribers": max(len(verified_subs), 1420),  # Baseline active Yamuna watch community
+            "active_subscribers": len(verified_subs),
             "monitored_wards": len(C.WARD_SCHEDULES),
             "by_ward": ward_counts,
         },

@@ -256,12 +256,13 @@ export default function LiveDashboard({ onBack, onOpenAuth, user, onSignOut }) {
 
                 <div className="plume-timeline">
                   {[
-                    { id: 'STATION_01_PANIPAT', label: 'Panipat I', dist: '68 km' },
-                    { id: 'STATION_02_PANIPAT', label: 'Panipat II', dist: '50 km' },
-                    { id: 'STATION_03_SONIPAT', label: 'Sonipat', dist: '38.5 km' },
-                    { id: 'STATION_04_PALLA', label: 'Palla (Delhi Border)', dist: '16.5 km' },
-                    { id: 'STATION_05_WAZIRABAD', label: 'Wazirabad Intake', dist: '0 km' },
+                    { id: 'STATION_01_PANIPAT', label: 'Panipat I' },
+                    { id: 'STATION_02_PANIPAT', label: 'Panipat II' },
+                    { id: 'STATION_03_SONIPAT', label: 'Sonipat' },
+                    { id: 'STATION_04_PALLA', label: 'Palla (Delhi Border)' },
+                    { id: 'STATION_05_WAZIRABAD', label: 'Wazirabad Intake' },
                   ].map((step, idx) => {
+                    const distance = status.stations?.find(s => s.station_id === step.id)?.distance_km
                     const isOrigin = status.incident.station_id === step.id
                     const isPassed = idx <= ['STATION_01_PANIPAT', 'STATION_02_PANIPAT', 'STATION_03_SONIPAT', 'STATION_04_PALLA', 'STATION_05_WAZIRABAD'].indexOf(status.incident.station_id)
                     const isTarget = step.id === 'STATION_05_WAZIRABAD'
@@ -276,7 +277,7 @@ export default function LiveDashboard({ onBack, onOpenAuth, user, onSignOut }) {
                         </div>
                         <div className="step-info">
                           <strong className="step-name">{step.label}</strong>
-                          <span className="step-dist mono">{step.dist}</span>
+                          <span className="step-dist mono">{Number.isFinite(distance) ? `${distance} km` : 'Distance unavailable'}</span>
                           {isOrigin && <span className="step-flag origin-flag">Plume Origin</span>}
                           {isTarget && (
                             <span className="step-flag eta-flag">

@@ -84,7 +84,7 @@ def public_status():
     for sid, meta in STATION_METADATA.items():
         s = db.stations.get(sid, {})
         tox = s.get("toxicity") or {}
-        stations.append({"station_id": sid, "name": meta["name"], "status": s.get("status", "NORMAL"),
+        stations.append({"station_id": sid, "name": meta["name"], "distance_km": meta["distance_km"], "status": s.get("status", "NORMAL"),
                          "unionized_ammonia_mgl": tox.get("unionized_ammonia_mgl"),
                          "toxicity_band": tox.get("band", "SAFE"),
                          "coords": C.STATION_COORDS.get(sid),
