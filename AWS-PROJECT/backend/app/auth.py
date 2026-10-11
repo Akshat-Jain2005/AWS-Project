@@ -50,13 +50,19 @@ def _public():
 
 
 def account_identity(record):
-    """Role dict for an email/password account record. Operator access requires
-    the account to be operator-eligible (a password was bound while the email's
-    ownership was proven) AND the email to still be on the operator allowlist by
-    exact address — domain allowlist entries rely on Google's verified hosted
-    domain, which a password account cannot provide, so they never apply here."""
+    """Role dict for an email/password account record. A provisioned staff
+    account carries its role (operator/reporter) directly — its session is only
+    ever minted through the MFA staff sign-in, so the stored role is trusted.
+    Otherwise it is a citizen member, which rises to operator only when the
+    account is operator-eligible (a password was bound while the email's
+    ownership was proven via Google) AND the email is still on the operator
+    allowlist by exact address — domain allowlist entries rely on Google's
+    verified hosted domain, which a password account cannot present."""
     email = (record.get("email") or "").lower()
     name = record.get("name") or email or "Member"
+    role = record.get("role")
+    if role in ("operator", "reporter"):
+        return {"role": role, "name": name, "id": "user:" + email, "email": email}
     operator = (bool(record.get("operator_eligible")) and bool(record.get("email_verified"))
                 and _email_allowed(email))
     return {"role": "operator" if operator else "authenticated",

@@ -30,7 +30,8 @@ def auth_config(response: Response):
     response.headers["Cache-Control"] = "no-store"
     return {"google_client_id": C.GOOGLE_CLIENT_ID, "dev_login_enabled": C.DEV_MODE,
             "password_login_enabled": bool(C.SESSION_SECRET),
-            "registration_enabled": bool(C.SESSION_SECRET)}
+            "registration_enabled": bool(C.SESSION_SECRET),
+            "staff_login_enabled": bool(C.SESSION_SECRET)}
 
 
 @router.get("/me")
