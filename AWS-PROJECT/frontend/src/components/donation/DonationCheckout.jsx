@@ -24,7 +24,35 @@ function loadRazorpay() {
   })
 }
 
-function UpiQrModal({ amount, notice, onClose, onSuccess }) {
+function UpiQrModal({ amount, notice, onClose, onSuccess, orderId }) {
+  useEffect(() => {
+    if (!orderId) return
+    let active = true
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await api(`/donations/order/${orderId}/status`)
+        if (active && res?.status === 'paid') {
+          clearInterval(interval)
+          onSuccess({
+            orderId: res.order_id || orderId,
+            paymentId: res.payment_id,
+            amountPaid: res.amount_inr || Number(amount),
+            donorEmail: res.donor_email,
+            donorName: res.donor_name,
+          })
+        }
+      } catch {
+        // keep polling
+      }
+    }, 2500)
+
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [orderId, amount, onSuccess])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm bs-fade" role="dialog" aria-modal="true">
       <div className="relative w-full max-w-sm bg-zinc-950 text-white rounded-3xl shadow-2xl border border-zinc-800 px-6 pt-6 pb-6">
@@ -32,10 +60,12 @@ function UpiQrModal({ amount, notice, onClose, onSuccess }) {
           className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 border-0 text-white cursor-pointer"><X size={18} /></button>
         {notice && <p className="text-[11px] text-amber-300 bg-amber-950/50 border border-amber-700/40 rounded-lg px-3 py-2 mb-4 mr-8">{notice}</p>}
         <DynamicUpiQr amount={amount} size={220} />
-        <button id="simulate-success" type="button" onClick={onSuccess}
-          className="mt-4 w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold border-0 cursor-pointer flex items-center justify-center gap-2">
-          <CheckCircle2 size={18} /> I have paid / Simulate success
-        </button>
+        <div className="mt-4 w-full py-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 text-center flex items-center justify-center gap-2.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+          <span className="text-xs text-zinc-300 font-medium">
+            Waiting for bank confirmation…
+          </span>
+        </div>
       </div>
     </div>
   )
@@ -64,8 +94,8 @@ export default function DonationCheckout({ location, onBack }) {
   const [qr, setQr] = useState(null) // null | { notice }
 
   // Sanitize & inspect the API key from Vite environment or backend fallback
-  const rawKey = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_Tm7Iyd7K6VPmH0'
-  const razorpayKey = rawKey ? String(rawKey).trim().replace(/['"]/g, '') : 'rzp_test_Tm7Iyd7K6VPmH0'
+  const rawKey = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_Tmd7C2dIIk9OPZ'
+  const razorpayKey = rawKey ? String(rawKey).trim().replace(/['"]/g, '') : 'rzp_test_Tmd7C2dIIk9OPZ'
 
   useEffect(() => {
     if (touched) setErrors(validateDetails({ amount, donor }))
@@ -165,7 +195,9 @@ export default function DonationCheckout({ location, onBack }) {
         name: donor.name ? donor.name.trim() : 'Aarav Sharma',
         email: donor.email ? donor.email.trim() : 'donor@example.com',
         contact: donor.phone ? `+91${donor.phone.replace(/\D/g, '')}` : '',
-        method: chosenMethod,
+        ...(chosenMethod === 'card' || chosenMethod === 'netbanking' || chosenMethod === 'wallet'
+          ? { method: chosenMethod }
+          : {}),
       },
       theme: {
         color: '#047857',
@@ -332,8 +364,17 @@ export default function DonationCheckout({ location, onBack }) {
         <UpiQrModal
           amount={amount}
           notice={qr.notice}
+          orderId={qr.orderId}
           onClose={() => setQr(null)}
-          onSuccess={() => handlePaymentSuccess({ amountPaid: Number(amount), donorEmail: donor.email, donorName: donor.name })}
+          onSuccess={(details) =>
+            handlePaymentSuccess({
+              orderId: details?.orderId,
+              paymentId: details?.paymentId,
+              amountPaid: details?.amountPaid || Number(amount),
+              donorEmail: donor.email,
+              donorName: donor.name,
+            })
+          }
         />
       )}
 
