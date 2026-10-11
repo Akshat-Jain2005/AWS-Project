@@ -27,6 +27,8 @@ def campaigns():
 
 @router.post("/donations/order")
 def create_order(body: OrderIn):
+    if not C.DEV_MODE and not (C.RAZORPAY_KEY_ID and C.RAZORPAY_KEY_SECRET):
+        raise HTTPException(503, "Payments are not configured. Please try again later.")
     if "@" not in body.donor_email:
         raise HTTPException(422, "Enter a valid email for the receipt")
     try:

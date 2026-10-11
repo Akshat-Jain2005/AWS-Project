@@ -51,6 +51,43 @@ function Compose({ onSent, wardHints }) {
           </label>
         ))}
       </div>
+      <div className="ai-template-bar">
+        <span className="ai-bar-title">✨ AWS Bedrock Prompts:</span>
+        <button
+          type="button"
+          className="btn-ai-template"
+          onClick={() =>
+            setMessage(
+              `Water alert: Industrial ammonia spike detected upstream. ${wards || 'Civil Lines'} will receive safe piped water as per DJB schedule. Store drinking water safely.`
+            )
+          }
+        >
+          Ammonia Spike Advisory
+        </button>
+        <button
+          type="button"
+          className="btn-ai-template"
+          onClick={() =>
+            setMessage(
+              `All clear: Yamuna water quality has normalized at Wazirabad intake. Piped water supply is fully restored in ${wards || 'all wards'}. Thank you.`
+            )
+          }
+        >
+          All-Clear Restoration
+        </button>
+        <button
+          type="button"
+          className="btn-ai-template"
+          onClick={() =>
+            setMessage(
+              `Emergency: Intake gate closure in effect. DJB clean water tankers deployed to ${wards || 'affected wards'} from 8 AM to 12 PM.`
+            )
+          }
+        >
+          Tanker Rationing Notice
+        </button>
+      </div>
+
       <label className="field-block">Message
         <textarea rows={3} value={message} placeholder="Advisory text for residents…" onChange={(e) => setMessage(e.target.value)} />
       </label>

@@ -57,6 +57,7 @@ PASSWORD_MIN_LENGTH = int(os.getenv("PASSWORD_MIN_LENGTH", "8"))
 # Amazon SNS – set USE_AWS_SNS=1 and provide topic ARNs to enable live delivery.
 # When disabled (default), all messages remain in the in-memory outbox only.
 AWS_REGION = os.getenv("AWS_REGION", "ap-southeast-2")
+REPORT_PHOTO_BUCKET = os.getenv("REPORT_PHOTO_BUCKET", "").strip()
 USE_AWS_SNS = os.getenv("USE_AWS_SNS", "0") == "1"
 SNS_TOPIC_ARN_OPERATORS = os.getenv("SNS_TOPIC_ARN_OPERATORS", "")
 SNS_TOPIC_ARN_CITIZENS = os.getenv("SNS_TOPIC_ARN_CITIZENS", "")

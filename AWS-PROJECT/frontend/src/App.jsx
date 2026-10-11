@@ -11,13 +11,18 @@ import Incidents from './views/Incidents'
 import GateControl from './views/GateControl'
 import Alerts from './views/Alerts'
 import Audit from './views/Audit'
+import Reports from './views/Reports'
+import StationWatch from './views/StationWatch'
+import LiveDashboard from './views/LiveDashboard'
 import logoMark from './assets/logo-mark.png'
 
 const TABS = [
   { id: 'overview', label: 'Overview', c: Overview },
+  { id: 'watch', label: 'Station watch', c: StationWatch },
   { id: 'incidents', label: 'Incidents', c: Incidents },
   { id: 'gate', label: 'Intake Gate', c: GateControl },
   { id: 'alerts', label: 'Alerts', c: Alerts },
+  { id: 'reports', label: 'Field reports', c: Reports },
   { id: 'audit', label: 'Audit', c: Audit },
 ]
 
@@ -103,7 +108,7 @@ function Console() {
       <main className="view" id="console-main" tabIndex={-1}>
         <ReadState loading={loading} error={error} retry={refresh} />
         <div role="tabpanel" aria-labelledby={`tab-${tab}`}>
-          <Active status={status} refreshStatus={refresh} />
+          <Active status={status} refreshStatus={refresh} onNavigate={setTab} />
         </div>
       </main>
     </div>
@@ -146,20 +151,20 @@ function PortalNav({ user, onSignIn, onSignOut, onLiveDashboard }) {
 // operators are routed to the Console by Gate. The auth screen is a sub-view.
 function Portal() {
   const { user, signOut, notice } = useAuth()
-  const [view, setView] = useState('home')   // 'home' | 'auth'
+  const [view, setView] = useState('home')   // 'home' | 'auth' | 'dashboard'
   const [authRole, setAuthRole] = useState('operator')  // 'operator' | 'reporter' | 'citizen'
   const [authMode, setAuthMode] = useState('signin')    // citizen: 'signin' | 'register'
   const member = Boolean(user?.role && user.role !== 'public')
   const openAuth = (role, mode = 'signin') => { setAuthRole(role); setAuthMode(mode); setView('auth') }
-  const scrollToDashboard = () => {
-    const el = document.getElementById('how-it-works') || document.getElementById('sensor')
-    el?.scrollIntoView({ behavior: 'smooth' })
-  }
-  // A signed-in member never sees the auth screen, even if `view` is stale.
-  const effectiveView = member ? 'home' : view
+  const openDashboard = () => setView('dashboard')
+  // Members never see the auth screen, but may open the public live dashboard.
+  const effectiveView = (member && view === 'auth') ? 'home' : view
 
   if (effectiveView === 'auth') {
     return <Auth initialRole={authRole} initialMode={authMode} onBack={() => setView('home')} />
+  }
+  if (effectiveView === 'dashboard') {
+    return <LiveDashboard onBack={() => setView('home')} onOpenAuth={openAuth} />
   }
   return (
     <div className="site">
@@ -168,10 +173,10 @@ function Portal() {
         onSignIn={() => openAuth('operator')}
         onRegister={() => openAuth('citizen', 'register')}
         onSignOut={() => { setView('home'); signOut() }}
-        onLiveDashboard={scrollToDashboard}
+        onLiveDashboard={openDashboard}
       />
       {notice && <p className="site-portal-notice" role="alert">{notice}</p>}
-      <Home onOpenAuth={openAuth} />
+      <Home onOpenAuth={openAuth} onOpenDashboard={openDashboard} />
     </div>
   )
 }

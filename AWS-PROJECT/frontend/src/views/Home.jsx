@@ -1,8 +1,9 @@
 import hardwareNodeImg from '../assets/hardware-node.jpg'
 import Biomonitor3DViewer from './Biomonitor3DViewer'
 
-export default function Home({ onOpenAuth }) {
+export default function Home({ onOpenAuth, onOpenDashboard }) {
   const scrollToDashboard = () => {
+    if (onOpenDashboard) return onOpenDashboard()
     document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })
   }
 
@@ -32,7 +33,7 @@ export default function Home({ onOpenAuth }) {
           <div className="hero-col-left">
             <div className="hero-badges-row">
               <span className="badge-hackathon">AWS ENVIRONMENTAL HACKATHON 2026</span>
-              <span className="badge-track">HEAT &amp; WATER TRACK</span>
+              <span className="badge-track">HEAT & WATER TRACK</span>
             </div>
 
             <h1 className="hero-main-title">
@@ -291,7 +292,7 @@ export default function Home({ onOpenAuth }) {
               <div className="process-step-num num-red">04</div>
               <h3 className="process-step-name">ACT</h3>
               <p className="process-step-desc">
-                Operators approve the gate. Residents get SMS in English and Hindi.
+                Operators approve the gate. Residents get Telegram and Amazon SNS alerts in English and Hindi.
               </p>
             </div>
           </div>
@@ -311,18 +312,20 @@ export default function Home({ onOpenAuth }) {
             <div className="role-portal-card border-top-blue">
               <h3 className="role-portal-title text-blue">PUBLIC</h3>
               <ul className="role-feature-list bullet-blue">
-                <li>Live river status</li>
+                <li>Live river status & AWS map</li>
                 <li>Water timings by ward</li>
-                <li>Free SMS alerts</li>
-                <li>Donate to relief</li>
+                <li>Telegram & Amazon SNS alerts</li>
+                <li>Delhi Jal Board advisory & intake forecast</li>
               </ul>
-              <button
-                type="button"
-                className="btn-role-portal btn-portal-primary"
-                onClick={scrollToDashboard}
-              >
-                Open public dashboard
-              </button>
+              <div className="role-portal-btns">
+                <button
+                  type="button"
+                  className="btn-role-portal btn-portal-primary"
+                  onClick={scrollToDashboard}
+                >
+                  Open live dashboard →
+                </button>
+              </div>
             </div>
 
             {/* Card 2: Reporters */}
@@ -379,9 +382,9 @@ export default function Home({ onOpenAuth }) {
             <button
               type="button"
               className="btn-banner-secondary"
-              onClick={() => onOpenAuth ? onOpenAuth('citizen', 'register') : scrollToDashboard()}
+              onClick={scrollToHowItWorks}
             >
-              Support the relief fund
+              See how it works
             </button>
           </div>
         </div>
@@ -391,7 +394,7 @@ export default function Home({ onOpenAuth }) {
       <footer className="site-landing-footer-minimal">
         <div className="footer-minimal-inner">
           <span className="footer-min-brand">BIO-SENTINEL</span>
-          <span className="footer-min-meta">AWS Environmental Hackathon 2026 / Heat &amp; Water</span>
+          <span className="footer-min-meta">AWS Environmental Hackathon 2026 / Heat & Water</span>
           <span className="footer-min-tech">Serverless on AWS</span>
         </div>
       </footer>

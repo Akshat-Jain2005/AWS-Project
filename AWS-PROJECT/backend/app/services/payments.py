@@ -49,13 +49,15 @@ def create_order(req, campaign_id):
 
 
 def signature_ok(order_id, payment_id, signature):
+    if not C.DEV_MODE and not C.RAZORPAY_KEY_SECRET:
+        return False
     expected = hmac.new(_secret().encode(), f"{order_id}|{payment_id}".encode(), hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 
 
 def webhook_signature_ok(raw_body: bytes, signature: str) -> bool:
     """Verify a Razorpay webhook payload against the raw request body."""
-    if not signature:
+    if not signature or (not C.DEV_MODE and not (C.RAZORPAY_WEBHOOK_SECRET or C.RAZORPAY_KEY_SECRET)):
         return False
     expected = hmac.new(_webhook_secret().encode(), raw_body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)

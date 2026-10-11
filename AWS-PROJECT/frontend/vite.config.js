@@ -8,7 +8,7 @@ import { defineConfig } from 'vite'
 const API_TARGET = process.env.VITE_API_TARGET || 'http://localhost:8000'
 const API_PATHS = [
   '/me', '/auth', '/status', '/stations', '/incidents', '/telemetry',
-  '/gate-command', '/alerts', '/audit', '/automation', '/river-health', '/map', '/subscribers',
+  '/gate-command', '/alerts', '/audit', '/automation', '/river-health', '/map', '/subscribers', '/subscribe', '/reports', '/campaigns', '/donations', '/verify-payment',
 ]
 
 // https://vite.dev/config/
