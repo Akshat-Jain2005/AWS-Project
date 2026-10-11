@@ -110,27 +110,31 @@ function Console() {
   )
 }
 
-function PortalNav({ user, onSignIn, onRegister, onSignOut }) {
+function PortalNav({ user, onSignIn, onSignOut, onLiveDashboard }) {
   const member = Boolean(user?.role && user.role !== 'public')
   return (
     <nav className="site-nav" aria-label="Primary">
       <div className="site-brand">
-        <img className="site-logo" src={logoMark} alt="" />
-        <span>
-          <span className="site-brand-name">Bio-Sentinel</span>
-          <span className="site-brand-sub">YAMUNA RIVER DEFENSE</span>
-        </span>
+        <img className="site-logo" src={logoMark} alt="Bio-Sentinel" />
+        <span className="site-brand-name">Bio-Sentinel</span>
+      </div>
+      <div className="site-nav-links">
+        <a href="#gap" className="site-nav-link">The gap</a>
+        <a href="#sensor" className="site-nav-link">The sensor</a>
+        <a href="#how-it-works" className="site-nav-link">How it works</a>
+        <a href="#roles" className="site-nav-link">Roles</a>
       </div>
       <div className="site-nav-actions">
         {member ? (
           <>
             <span className="site-userchip">{user.name}</span>
-            <button type="button" className="site-ghost" onClick={onSignOut}>Sign out</button>
+            <button type="button" className="site-nav-login" onClick={onSignOut}>Sign out</button>
+            <button type="button" className="site-nav-dashboard" onClick={onLiveDashboard}>Live dashboard →</button>
           </>
         ) : (
           <>
-            <button type="button" className="site-ghost" onClick={onSignIn}>Sign in</button>
-            <button type="button" className="site-ticket" onClick={onRegister}>Create account</button>
+            <button type="button" className="site-nav-login" onClick={onSignIn}>Operator login</button>
+            <button type="button" className="site-nav-dashboard" onClick={onLiveDashboard}>Live dashboard →</button>
           </>
         )}
       </div>
@@ -147,6 +151,10 @@ function Portal() {
   const [authMode, setAuthMode] = useState('signin')    // citizen: 'signin' | 'register'
   const member = Boolean(user?.role && user.role !== 'public')
   const openAuth = (role, mode = 'signin') => { setAuthRole(role); setAuthMode(mode); setView('auth') }
+  const scrollToDashboard = () => {
+    const el = document.getElementById('how-it-works') || document.getElementById('sensor')
+    el?.scrollIntoView({ behavior: 'smooth' })
+  }
   // A signed-in member never sees the auth screen, even if `view` is stale.
   const effectiveView = member ? 'home' : view
 
@@ -160,9 +168,10 @@ function Portal() {
         onSignIn={() => openAuth('operator')}
         onRegister={() => openAuth('citizen', 'register')}
         onSignOut={() => { setView('home'); signOut() }}
+        onLiveDashboard={scrollToDashboard}
       />
       {notice && <p className="site-portal-notice" role="alert">{notice}</p>}
-      <Home />
+      <Home onOpenAuth={openAuth} />
     </div>
   )
 }
