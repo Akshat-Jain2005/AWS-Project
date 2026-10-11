@@ -6,7 +6,7 @@ import requests
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from bio_sentinel_inference import STATION_METADATA, evaluate_telemetry
 from .. import config as C
-from ..auth import require_operator
+from ..auth import require_operator, current_user
 from ..schemas import TelemetryPayload
 from ..services import incidents, toxicity
 from ..store import db
@@ -21,6 +21,23 @@ _KEY_QS = re.compile(r"[?&]key=[^&]*")
 
 def _als_base():
     return f"https://maps.geo.{C.AWS_REGION}.amazonaws.com"
+
+
+@router.get("/auth/config")
+def auth_config(response: Response):
+    """Public: the Google OAuth client id the operator console signs in with.
+    Served from the backend so the SPA needs no rebuild to pick up the id."""
+    response.headers["Cache-Control"] = "no-store"
+    return {"google_client_id": C.GOOGLE_CLIENT_ID, "dev_login_enabled": C.DEV_MODE,
+            "password_login_enabled": bool(C.SESSION_SECRET),
+            "registration_enabled": bool(C.SESSION_SECRET)}
+
+
+@router.get("/me")
+def me(response: Response, user=Depends(current_user)):
+    """Resolve the caller's identity and role for the console's auth state."""
+    response.headers["Cache-Control"] = "no-store"
+    return {"role": user["role"], "name": user["name"], "email": user.get("email"), "id": user["id"]}
 
 
 @router.post("/telemetry")

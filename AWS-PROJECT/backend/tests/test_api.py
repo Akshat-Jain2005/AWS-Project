@@ -341,3 +341,31 @@ def test_river_health_time_window_bounds_incident_age(client):
     # Query bounds are enforced (ge=1, le=168)
     assert client.get("/river-health/x?hours=0").status_code == 422
     assert client.get("/river-health/x?hours=200").status_code == 422
+
+
+# ---------- auth: /me, /auth/config, and Google operator sign-in ----------
+
+def test_auth_config_and_me(client):
+    assert "google_client_id" in client.get("/auth/config").json()
+    assert client.get("/me").json()["role"] == "public"
+    assert client.get("/me", headers=OP1).json()["role"] == "operator"
+
+
+def test_google_signin_authorizes_only_allowlisted_operators(client, monkeypatch):
+    from app import auth
+    monkeypatch.setattr(config, "GOOGLE_CLIENT_ID", "test.apps.googleusercontent.com")
+    monkeypatch.setattr(config, "OPERATOR_ALLOWLIST", ["chief@dept.gov.in", "@ops.gov.in"])
+    state = {"email": ""}
+    monkeypatch.setattr(auth, "_verify_google",
+                        lambda token: {"sub": "123456789", "email_verified": True,
+                                       "email": state["email"], "name": "Op",
+                                       "hd": state["email"].rsplit("@", 1)[-1]})
+    jwt = {"Authorization": "Bearer aaa.bbb.ccc"}  # JWT-shaped (two dots); value is irrelevant to the fake verifier
+
+    state["email"] = "chief@dept.gov.in"          # exact allowlist match
+    assert client.get("/me", headers=jwt).json()["role"] == "operator"
+    state["email"] = "eng@ops.gov.in"             # domain allowlist match
+    assert client.get("/stations", headers=jwt).status_code == 200
+    state["email"] = "stranger@gmail.com"         # verified but not authorized
+    assert client.get("/me", headers=jwt).json()["role"] == "authenticated"
+    assert client.get("/stations", headers=jwt).status_code == 403

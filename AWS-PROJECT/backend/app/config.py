@@ -24,10 +24,35 @@ def _tokens(name, default):
 DEV_MODE = os.getenv("DEV_MODE", "0") == "1"
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")]
 
-# Local stand-in for Cognito. Replace with JWT verification at deploy time.
+# Development tokens are accepted only when DEV_MODE is explicitly enabled.
 OPERATOR_TOKENS = _tokens("OPERATOR_TOKENS", "dev-operator-1:Operator One,dev-operator-2:Operator Two")
 REPORTER_TOKENS = _tokens("REPORTER_TOKENS", "dev-reporter:Verified Reporter")
 SENSOR_API_KEY = os.getenv("SENSOR_API_KEY", "")
+
+# Google sign-in for operators. GOOGLE_CLIENT_ID is the OAuth 2.0 Web client id
+# (…apps.googleusercontent.com); the frontend fetches it from /auth/config so no
+# rebuild is needed. OPERATOR_ALLOWLIST authorizes operators by exact email or by
+# domain (an entry beginning with "@", e.g. "@dept.gov.in"). A verified Google
+# account not on the list signs in but is refused operator access.
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+OPERATOR_ALLOWLIST = [e.strip().lower() for e in os.getenv("OPERATOR_ALLOWLIST", "").split(",") if e.strip()]
+
+# Amazon DynamoDB — single-table store (pk/sk + a gsi1 index). DDB_TABLE_NAME
+# selects the table; DDB_ENDPOINT_URL points at DynamoDB Local (e.g.
+# http://localhost:8000) for development and is left blank to use real AWS
+# DynamoDB. Email/password account records live here and REQUIRE the table to
+# exist — run create_table.py once before first use.
+DDB_TABLE_NAME = os.getenv("DDB_TABLE_NAME", "biosentinel")
+DDB_ENDPOINT_URL = os.getenv("DDB_ENDPOINT_URL", "").strip() or None
+
+# Email/password sign-in. SESSION_SECRET signs the stateless session tokens
+# minted at login; it MUST be set in production — password sign-in fails closed
+# when it is absent. A fixed development value is used only when DEV_MODE is on
+# so local runs and tests work without extra configuration. SESSION_TTL_S bounds
+# how long a minted token stays valid; PASSWORD_MIN_LENGTH is enforced on signup.
+SESSION_SECRET = os.getenv("SESSION_SECRET", "dev-session-secret-not-for-production" if DEV_MODE else "").strip()
+SESSION_TTL_S = int(os.getenv("SESSION_TTL_S", str(7 * 86400)))
+PASSWORD_MIN_LENGTH = int(os.getenv("PASSWORD_MIN_LENGTH", "8"))
 
 # Amazon SNS – set USE_AWS_SNS=1 and provide topic ARNs to enable live delivery.
 # When disabled (default), all messages remain in the in-memory outbox only.
