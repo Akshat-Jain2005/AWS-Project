@@ -12,6 +12,10 @@ os.environ["SNS_TOPIC_ARN_CITIZENS"] = ""
 os.environ["RAZORPAY_KEY_ID"] = ""
 os.environ["RAZORPAY_KEY_SECRET"] = ""
 os.environ["RAZORPAY_WEBHOOK_SECRET"] = ""
+# Keep Google sign-in inert by default so tests don't depend on a real client id;
+# the Google-auth test sets these explicitly via monkeypatch.
+os.environ["GOOGLE_CLIENT_ID"] = ""
+os.environ["OPERATOR_ALLOWLIST"] = ""
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import pytest

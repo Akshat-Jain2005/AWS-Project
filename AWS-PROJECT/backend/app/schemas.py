@@ -1,5 +1,8 @@
+import re
 from typing import List, Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 class ChemicalTelemetry(BaseModel):
@@ -86,3 +89,43 @@ class RulesIn(BaseModel):
     operator_telegram_on_incident: Optional[bool] = None
     sms_on_shutdown: Optional[bool] = None
     all_clear_on_restore: Optional[bool] = None
+
+
+class RegisterIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=8, max_length=200)
+
+    @field_validator("email")
+    @classmethod
+    def _valid_email(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not _EMAIL_RE.match(v):
+            raise ValueError("Enter a valid email address")
+        return v
+
+
+class LoginIn(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=1, max_length=200)
+
+    @field_validator("email")
+    @classmethod
+    def _lower_email(cls, v: str) -> str:
+        return v.strip().lower()
+
+
+class SetPasswordIn(BaseModel):
+    password: str = Field(min_length=8, max_length=200)
+
+
+class StaffLoginIn(BaseModel):
+    role: Literal["operator", "reporter"]
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=1, max_length=200)
+    code: str = Field(min_length=6, max_length=12)
+
+    @field_validator("email")
+    @classmethod
+    def _lower_email(cls, v: str) -> str:
+        return v.strip().lower()
