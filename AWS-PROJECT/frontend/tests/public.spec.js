@@ -37,8 +37,8 @@ async function setup(page) {
 test('the public advisory page is open without signing in', async ({ page }) => {
   await setup(page)
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Bio-Sentinel', exact: true })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Monitoring stations' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Yamuna water watch', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'River threat corridor' })).toBeVisible()
   await expect(page.getByRole('tab')).toHaveCount(0)
   await expect(page.locator('.site-nav').getByRole('button', { name: 'Create account', exact: true })).toBeVisible()
 })

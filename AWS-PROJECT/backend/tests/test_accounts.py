@@ -93,10 +93,10 @@ def test_bad_login_is_generic(client, creds):
 
 
 def test_tampered_or_expired_token_is_public(client):
-    token = register(client).json()["token"]
+    token = register(client, email="tamper@example.com").json()["token"]
     forged = token[:-1] + ("A" if token[-1] != "A" else "B")
     assert client.get("/me", headers={"Authorization": f"Bearer {forged}"}).json()["role"] == "public"
-    expired = sessions.mint("member@example.com", ttl=-10)
+    expired = sessions.mint("tamper@example.com", ttl=-10)
     assert client.get("/me", headers={"Authorization": f"Bearer {expired}"}).json()["role"] == "public"
 
 

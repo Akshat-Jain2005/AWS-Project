@@ -117,6 +117,103 @@ export default function GateControl({ status, refreshStatus }) {
           </ul>
         </Panel>
       )}
+
+      {/* Automation Rules & Intake Fail-Safe Panel */}
+      <AutomationRules />
     </div>
+  )
+}
+
+function AutomationRules() {
+  const [rules, setRules] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [saveMsg, setSaveMsg] = useState('')
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    api('/automation/rules')
+      .then((r) => setRules(r))
+      .catch((e) => setError(e.message))
+  }, [])
+
+  const updateRule = async (key, val) => {
+    setBusy(true)
+    setError('')
+    setSaveMsg('')
+    try {
+      const updated = await api('/automation/rules', {
+        method: 'PUT',
+        body: { [key]: val },
+      })
+      setRules(updated)
+      setSaveMsg('Automation rule updated and logged to audit chain.')
+      setTimeout(() => setSaveMsg(''), 4000)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!rules) return null
+
+  return (
+    <Panel
+      title="Intake Automation & Fail-Safe Rules"
+      meta="Autonomous SCADA & Trigger Thresholds"
+      className="rules-panel"
+    >
+      <p className="hint">
+        Configured triggers govern automatic multi-channel dispatches and emergency intake
+        actuations when biological sensors detect severe toxic plumes.
+      </p>
+
+      <div className="automation-rules-grid">
+        <label className="rule-toggle-card">
+          <div className="rule-card-info">
+            <strong>Operator Telegram on Incident</strong>
+            <p>Automatically push real-time alert to Operator Telegram Channel whenever upstream anomaly triggers.</p>
+          </div>
+          <input
+            type="checkbox"
+            className="rule-switch"
+            checked={Boolean(rules.operator_telegram_on_incident)}
+            disabled={busy}
+            onChange={(e) => updateRule('operator_telegram_on_incident', e.target.checked)}
+          />
+        </label>
+
+        <label className="rule-toggle-card">
+          <div className="rule-card-info">
+            <strong>Amazon SNS Citizen Broadcast on Shutdown</strong>
+            <p>Immediately dispatch ward-by-ward rationing notices to residents via AWS SNS upon intake closure.</p>
+          </div>
+          <input
+            type="checkbox"
+            className="rule-switch"
+            checked={Boolean(rules.sms_on_shutdown)}
+            disabled={busy}
+            onChange={(e) => updateRule('sms_on_shutdown', e.target.checked)}
+          />
+        </label>
+
+        <label className="rule-toggle-card">
+          <div className="rule-card-info">
+            <strong>All-Clear Broadcast on Intake Restoration</strong>
+            <p>Notify citizens and tanker logistics when normal Wazirabad intake supply is safely restored.</p>
+          </div>
+          <input
+            type="checkbox"
+            className="rule-switch"
+            checked={Boolean(rules.all_clear_on_restore)}
+            disabled={busy}
+            onChange={(e) => updateRule('all_clear_on_restore', e.target.checked)}
+          />
+        </label>
+      </div>
+
+      {saveMsg && <p className="success-inline" role="status">✓ {saveMsg}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+    </Panel>
   )
 }

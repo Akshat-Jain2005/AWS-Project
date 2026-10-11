@@ -87,6 +87,7 @@ def public_status():
         stations.append({"station_id": sid, "name": meta["name"], "status": s.get("status", "NORMAL"),
                          "unionized_ammonia_mgl": tox.get("unionized_ammonia_mgl"),
                          "toxicity_band": tox.get("band", "SAFE"),
+                         "coords": C.STATION_COORDS.get(sid),
                          "updated_at": s.get("updated_at")})
     open_incs = [incidents.incident_view(i) for i in db.incidents.values() if i["status"] != "CLOSED"]
     top = max(open_incs, key=lambda i: incidents.LEVEL_RANK[i["level"]], default=None)

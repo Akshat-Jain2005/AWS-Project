@@ -1,10 +1,9 @@
 import time
-import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request
 from .. import config as C
 from ..auth import current_user, require_operator
-from ..schemas import ReportIn, ReportReview
-from ..services import incidents
+from ..schemas import ReportIn, ReportReview, PhotoUploadIn
+from ..services import incidents, photos
 from ..store import db
 
 router = APIRouter()
@@ -16,13 +15,19 @@ def _public(r):
 
 
 @router.post("/reports/upload-url")
-def upload_url(user=Depends(current_user)):
-    # Local placeholder. At deploy time this returns a presigned S3 URL.
-    return {"photo_key": f"reports/{uuid.uuid4().hex}.jpg", "upload_url": None}
+def upload_url(body: PhotoUploadIn, request: Request, user=Depends(current_user)):
+    if not C.REPORT_PHOTO_BUCKET:
+        raise HTTPException(503, "Photo storage is not configured. Submit without a photo or try later.")
+    ip = request.client.host if request.client else "unknown"
+    if db.rate_limited(f"photo:{ip}", 5, 3600):
+        raise HTTPException(429, "Too many photo uploads. Try again later.")
+    return photos.upload(body.content_type)
 
 
 @router.post("/reports", status_code=201)
 def submit_report(body: ReportIn, request: Request, user=Depends(current_user)):
+    if body.photo_key and (not C.REPORT_PHOTO_BUCKET or not photos.KEY.fullmatch(body.photo_key)):
+        raise HTTPException(422, "Invalid report photo reference")
     verified = user["role"] in ("reporter", "operator")
     ip = request.client.host if request.client else "unknown"
     if not verified and db.rate_limited(f"report:{ip}", 5, 3600):
@@ -54,7 +59,7 @@ def approved_reports(limit: int = 50):
 def pending_reports(user=Depends(require_operator)):
     rows = [r for r in db.reports.values() if r["status"] == "pending"]
     rows.sort(key=lambda r: -r["created_at"])
-    return [{**r, "status": r["status"]} for r in rows]
+    return [{**r, "photo_url": photos.review_url(r.get("photo_key"))} for r in rows]
 
 
 @router.patch("/reports/{report_id}")

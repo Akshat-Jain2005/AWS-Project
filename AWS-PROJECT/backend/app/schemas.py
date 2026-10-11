@@ -42,12 +42,17 @@ class ReportReview(BaseModel):
     note: str = Field(default="", max_length=200)
 
 
+class PhotoUploadIn(BaseModel):
+    content_type: Literal["image/jpeg", "image/png", "image/webp"]
+
+
 class SubscribeIn(BaseModel):
     phone: str
     ward: str = Field(min_length=2, max_length=60)
     language: Literal["en", "hi", "both"] = "en"
     alert_types: List[Literal["pollution", "rationing", "all_clear"]] = ["pollution", "rationing", "all_clear"]
     consent: bool
+    direct: bool = False
 
 
 class OtpVerifyIn(BaseModel):

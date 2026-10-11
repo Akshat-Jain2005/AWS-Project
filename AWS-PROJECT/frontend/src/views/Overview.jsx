@@ -1,3 +1,4 @@
+import StationWatch from './StationWatch'
 import { usePoll } from '../api'
 import { Panel, TimeBar, ReadState } from '../ui'
 import { fmtDur, levelMeta } from '../format'
@@ -12,14 +13,14 @@ const SHORT = {
 const sevOf = (lvl) => levelMeta(lvl).sev
 const healthSev = { NORMAL: 'normal', WARNING: 'warning', CRITICAL: 'critical' }
 
-function Corridor({ stations, reaches }) {
+export function Corridor({ stations, reaches }) {
   if (!stations?.length) return <div className="corridor-empty">Awaiting station telemetry…</div>
   const W = 1000, H = 210, y = 120
   const n = stations.length
   const xs = stations.map((_, i) => 70 + (i * (W - 140)) / Math.max(1, n - 1))
   const reachSev = (fromId) => {
     const r = reaches?.find((f) => f.properties.from_node === fromId)
-    return r ? healthSev[r.properties.health_status] || 'normal' : 'normal'
+    return r ? healthSev[r.properties.health_status] || 'unknown' : 'unknown'
   }
   return (
     <svg className="corridor" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="River corridor status, Panipat to Wazirabad intake">
@@ -36,7 +37,7 @@ function Corridor({ stations, reaches }) {
           <g key={s.station_id} transform={`translate(${xs[i]}, ${y})`} className={`node sev-${sev}`}>
             <circle r="11" className={`node-dot ${active ? 'is-active' : ''}`} />
             {active && <circle r="20" className="node-halo" />}
-            <text y="-26" className="node-name">{SHORT[s.station_id] || s.station_id}</text>
+            <text y="-26" className="node-name">{SHORT[s.station_id] || s.name || s.station_id}</text>
             <text y="42" className="node-state">{s.updated_at ? levelMeta(s.status).label : 'Awaiting telemetry'}</text>
           </g>
         )
@@ -46,7 +47,7 @@ function Corridor({ stations, reaches }) {
   )
 }
 
-export default function Overview({ status }) {
+export default function Overview({ status, onNavigate }) {
   const { data: health, error, loading, refresh } = usePoll('/river-health/yamuna-panipat', 8000)
   const inc = status?.incident
   const stations = status?.stations || []
@@ -95,6 +96,14 @@ export default function Overview({ status }) {
         </ol>
       </Panel>
 
+      <StationWatch stations={stations} />
+      <Panel title="Emergency response" meta="Operator approval required">
+        <div className="action-row">
+          <button className="btn-danger" onClick={() => onNavigate?.('gate')}>Control intake gate</button>
+          <button className="btn-secondary" onClick={() => onNavigate?.('alerts')}>Send SMS + Telegram alert</button>
+          <button className="btn-secondary" onClick={() => onNavigate?.('reports')}>Review field reports</button>
+        </div>
+      </Panel>
       {rationing.length > 0 && (
         <Panel title="Rationing in effect" meta={`intake closed · −${status.deficit_mgd} MGD`} className="rationing">
           <ul className="ration-list">

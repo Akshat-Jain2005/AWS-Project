@@ -139,8 +139,7 @@ export default function Biomonitor3DViewer() {
 
         {/* Drag Hint at bottom */}
         <div className="stage-drag-hint">
-          <span className="drag-icon">↔</span>
-          <span>Click &amp; drag to rotate 360° · Scroll to zoom</span>
+          <span>Click &amp; drag to rotate 360° · Scroll to zoom · Hover pins for hardware details</span>
         </div>
       </div>
     </div>
