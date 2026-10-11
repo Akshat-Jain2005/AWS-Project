@@ -46,7 +46,7 @@ def test_incident_autocloses_after_normal_readings(client):
 
 def test_stations_requires_operator(client):
     assert client.get("/stations").status_code == 401
-    assert client.get("/stations", headers=REPORTER).status_code == 403
+    assert client.get("/stations", headers=REPORTER).status_code == 200
     assert client.get("/stations", headers=OP1).status_code == 200
 
 

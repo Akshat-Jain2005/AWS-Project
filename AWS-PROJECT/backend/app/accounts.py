@@ -105,8 +105,7 @@ def get_user(email: str):
     try:
         r = _table().get_item(Key={"pk": _pk(norm), "sk": "META"})
         item = r.get("Item")
-        if item:
-            return dict(item)
+        return dict(item) if item else None
     except Exception as e:
         log.warning("DynamoDB get_user failed (%s): %s", email, e)
     if norm in _local_users:
@@ -122,8 +121,6 @@ def get_user(email: str):
 def create_user(email: str, name: str, password: str, *, phone: str = "", alt_phone: str = "") -> dict:
     """Create a new member account. Raises UserExists if the email is taken."""
     email = _norm(email)
-    if get_user(email):
-        raise UserExists(email)
     item = {
         "pk": _pk(email), "sk": "META",
         "email": email, "name": (name or "").strip() or email,
@@ -138,6 +135,7 @@ def create_user(email: str, name: str, password: str, *, phone: str = "", alt_ph
 
     try:
         _table().put_item(Item=item, ConditionExpression="attribute_not_exists(pk)")
+        return item
     except ClientError as e:
         if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
             raise UserExists(email)
@@ -145,6 +143,8 @@ def create_user(email: str, name: str, password: str, *, phone: str = "", alt_ph
     except Exception as e:
         log.warning("DynamoDB put_item failed, persisting to local store: %s", e)
 
+    if email in _local_users:
+        raise UserExists(email)
     _local_users[email] = item
     _save_local_users()
     return item
@@ -166,6 +166,7 @@ def set_password(email: str, name: str, password: str, *, operator_eligible: boo
     }
     try:
         _table().put_item(Item=item)
+        return item
     except Exception as e:
         log.warning("DynamoDB set_password failed, persisting to local store: %s", e)
     _local_users[email] = item
@@ -192,6 +193,7 @@ def create_staff(email: str, name: str, password: str, role: str):
     }
     try:
         _table().put_item(Item=item)
+        return item, secret
     except Exception as e:
         log.warning("DynamoDB create_staff failed, persisting to local store: %s", e)
     _local_users[email] = item

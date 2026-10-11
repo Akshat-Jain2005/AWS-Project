@@ -131,18 +131,11 @@ def staff_login(body: StaffLoginIn, request: Request, response: Response):
     if not record and is_staff_allowlisted:
         # Auto-provision allowlisted staff account
         record, _ = accounts.create_staff(body.email, body.email.split("@")[0].title(), body.password, body.role)
-    elif record and is_staff_allowlisted and record.get("role") != body.role:
-        # Allow allowlisted staff to sign in under their selected staff role
-        record["role"] = body.role
-        accounts._local_users[body.email] = record
-        accounts._save_local_users()
-    
-    if not record or record.get("role") not in ("operator", "reporter"):
-        raise HTTPException(401, "No valid operator or reporter account found for this email.")
-    
-    # Check password
-    if not accounts.verify_password(record, body.password):
-        raise HTTPException(401, "Incorrect email or password")
+
+    bad = (not record or record.get("role") != body.role
+           or not accounts.verify_password(record, body.password))
+    if bad:
+        raise HTTPException(401, "Incorrect email, password, or authenticator code")
     
     # Check code: either email OTP or TOTP authenticator
     rec_otp = db.get_otp(f"EMAIL#{body.email}")
@@ -153,7 +146,7 @@ def staff_login(body: StaffLoginIn, request: Request, response: Response):
     totp_ok = totp.verify(record.get("totp_secret"), body.code) if record.get("totp_secret") else False
     
     if not (email_otp_ok or totp_ok):
-        raise HTTPException(401, "Incorrect authenticator or email verification code")
+        raise HTTPException(401, "Incorrect email, password, or authenticator code")
         
     token = _mint_or_503(body.email)
     response.headers["Cache-Control"] = "no-store"

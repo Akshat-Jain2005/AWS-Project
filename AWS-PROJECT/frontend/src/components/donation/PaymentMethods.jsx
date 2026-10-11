@@ -91,9 +91,13 @@ export default function PaymentMethods({
       >
         <div className="flex items-center gap-2 mb-1">
           <Smartphone size={16} className="text-slate-700" />
-          <p className="font-semibold text-slate-900">UPI Options</p>
+          <p className="font-semibold text-slate-900">UPI Options (Razorpay)</p>
         </div>
-        <p className="text-sm text-slate-600 mb-3">Pay directly using GPay, PhonePe, or Paytm via Razorpay</p>
+        <p className="text-sm text-slate-600 mb-2">
+          Pay via Razorpay Test Gateway. In the Razorpay popup, select <strong>UPI</strong> and enter{' '}
+          <code className="text-xs font-mono bg-stone-200 text-stone-800 px-1.5 py-0.5 rounded">success@razorpay</code>{' '}
+          (or click the green <strong>Success</strong> test button).
+        </p>
 
         <div className="flex flex-wrap gap-2.5" role="group" aria-label="Select UPI Application">
           {UPI_APPS.map((a) => {

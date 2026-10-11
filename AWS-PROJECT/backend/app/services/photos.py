@@ -3,6 +3,7 @@ import re
 import uuid
 from functools import lru_cache
 import boto3
+from botocore.client import Config
 from .. import config as C
 
 MAX_BYTES = 5 * 1024 * 1024
@@ -11,7 +12,12 @@ KEY = re.compile(r"reports/[a-f0-9]{32}\.(jpg|png|webp)\Z")
 
 @lru_cache(maxsize=1)
 def client():
-    return boto3.client("s3", region_name=C.AWS_REGION)
+    return boto3.client(
+        "s3",
+        region_name=C.AWS_REGION,
+        endpoint_url=f"https://s3.{C.AWS_REGION}.amazonaws.com",
+        config=Config(signature_version="s3v4", s3={"addressing_style": "virtual"}),
+    )
 
 
 def upload(content_type):

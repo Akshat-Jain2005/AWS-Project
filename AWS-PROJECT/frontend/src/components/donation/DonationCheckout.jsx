@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ShieldCheck, AlertCircle, CheckCircle2, X } from 'lucide-react'
 import { api } from '../../api'
-import DynamicUpiQr from './DynamicUpiQr'
 import AmountSelector, { PRESETS, inr } from './AmountSelector'
 import DonorDetailsForm from './DonorDetailsForm'
 import PaymentMethods from './PaymentMethods'
@@ -24,53 +23,6 @@ function loadRazorpay() {
   })
 }
 
-function UpiQrModal({ amount, notice, onClose, onSuccess, orderId }) {
-  useEffect(() => {
-    if (!orderId) return
-    let active = true
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await api(`/donations/order/${orderId}/status`)
-        if (active && res?.status === 'paid') {
-          clearInterval(interval)
-          onSuccess({
-            orderId: res.order_id || orderId,
-            paymentId: res.payment_id,
-            amountPaid: res.amount_inr || Number(amount),
-            donorEmail: res.donor_email,
-            donorName: res.donor_name,
-          })
-        }
-      } catch {
-        // keep polling
-      }
-    }, 2500)
-
-    return () => {
-      active = false
-      clearInterval(interval)
-    }
-  }, [orderId, amount, onSuccess])
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm bs-fade" role="dialog" aria-modal="true">
-      <div className="relative w-full max-w-sm bg-zinc-950 text-white rounded-3xl shadow-2xl border border-zinc-800 px-6 pt-6 pb-6">
-        <button type="button" onClick={onClose} aria-label="Close"
-          className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 border-0 text-white cursor-pointer"><X size={18} /></button>
-        {notice && <p className="text-[11px] text-amber-300 bg-amber-950/50 border border-amber-700/40 rounded-lg px-3 py-2 mb-4 mr-8">{notice}</p>}
-        <DynamicUpiQr amount={amount} size={220} />
-        <div className="mt-4 w-full py-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 text-center flex items-center justify-center gap-2.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-          <span className="text-xs text-zinc-300 font-medium">
-            Waiting for bank confirmation…
-          </span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export function validateDetails({ amount, donor }) {
   const e = {}
   if (!(Number(amount) >= 10)) e.amount = 'Minimum donation is ₹10.'
@@ -91,7 +43,6 @@ export default function DonationCheckout({ location, onBack }) {
   const [busy, setBusy] = useState(false)
   const [receipt, setReceipt] = useState(null)
   const [errorToast, setErrorToast] = useState(null)
-  const [qr, setQr] = useState(null) // null | { notice }
 
   // Sanitize & inspect the API key from Vite environment or backend fallback
   const rawKey = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_Tmd7C2dIIk9OPZ'
@@ -105,7 +56,6 @@ export default function DonationCheckout({ location, onBack }) {
     ({ orderId, paymentId, amountPaid, donorEmail, donorName }) => {
       setBusy(false)
       setErrorToast(null)
-      setQr(null)
       setReceipt({
         orderId: orderId || `order_${Date.now().toString(36)}`,
         paymentId: paymentId || `pay_${Date.now().toString(36)}`,
@@ -195,9 +145,6 @@ export default function DonationCheckout({ location, onBack }) {
         name: donor.name ? donor.name.trim() : 'Aarav Sharma',
         email: donor.email ? donor.email.trim() : 'donor@example.com',
         contact: donor.phone ? `+91${donor.phone.replace(/\D/g, '')}` : '',
-        ...(chosenMethod === 'card' || chosenMethod === 'netbanking' || chosenMethod === 'wallet'
-          ? { method: chosenMethod }
-          : {}),
       },
       theme: {
         color: '#047857',
@@ -358,24 +305,6 @@ export default function DonationCheckout({ location, onBack }) {
             </button>
           </div>
         </div>
-      )}
-
-      {qr && (
-        <UpiQrModal
-          amount={amount}
-          notice={qr.notice}
-          orderId={qr.orderId}
-          onClose={() => setQr(null)}
-          onSuccess={(details) =>
-            handlePaymentSuccess({
-              orderId: details?.orderId,
-              paymentId: details?.paymentId,
-              amountPaid: details?.amountPaid || Number(amount),
-              donorEmail: donor.email,
-              donorName: donor.name,
-            })
-          }
-        />
       )}
 
       {/* Automatic Transition to PaymentSuccessModal */}
