@@ -131,6 +131,15 @@ def staff_login(body: StaffLoginIn, request: Request, response: Response):
     if not record and is_staff_allowlisted:
         # Auto-provision allowlisted staff account
         record, _ = accounts.create_staff(body.email, body.email.split("@")[0].title(), body.password, body.role)
+    elif record and is_staff_allowlisted and record.get("role") != body.role and body.role in ("operator", "reporter"):
+        # Allow allowlisted staff to switch between authorized staff roles
+        record["role"] = body.role
+        try:
+            accounts._table().put_item(Item=record)
+        except Exception:
+            pass
+        accounts._local_users[body.email] = record
+        accounts._save_local_users()
 
     bad = (not record or record.get("role") != body.role
            or not accounts.verify_password(record, body.password))
