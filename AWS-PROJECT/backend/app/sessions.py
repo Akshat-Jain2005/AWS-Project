@@ -8,6 +8,8 @@ expiry — never the role. The caller's role is recomputed from the live account
 on every request, so changing the operator allowlist or an account flag takes
 effect immediately and no stale role is ever frozen into a token.
 """
+from __future__ import annotations
+
 import base64
 import hashlib
 import hmac

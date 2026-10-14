@@ -8,6 +8,8 @@ so register/login need the table to exist (real AWS or DynamoDB Local; tests
 use moto). The boto3 resource is created lazily so importing this module never
 touches the network and the app stays importable without AWS configured.
 """
+from __future__ import annotations
+
 import hashlib
 import hmac
 import json

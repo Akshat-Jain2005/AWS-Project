@@ -4,6 +4,8 @@ Stdlib only: HMAC-SHA1 over a 30-second counter, 6 digits, with a ±1 step windo
 to tolerate clock skew. Secrets are base32 — the format authenticator apps expect
 — so this is interoperable with Google Authenticator, Authy, 1Password, etc.
 """
+from __future__ import annotations
+
 import base64
 import hashlib
 import hmac
